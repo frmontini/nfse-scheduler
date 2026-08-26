@@ -239,7 +239,7 @@ O layout fica em `src/danfse.js` e a leitura da visualização em `src/danfse-pa
 
 Nas tabelas não existe coluna com o número da NFS-e: o que interessa no dia a dia é o documento, que abre em um visualizador dentro do painel (com botões de baixar e abrir em nova aba). O número continua nos *Detalhes* da nota e impresso no próprio DANFSe.
 
-No Histórico, **Gerar DANFSe** relê a nota no portal e monta o documento de novo — útil quando o layout melhora ou quando a nota foi emitida por uma versão antiga.
+No Histórico, **Gerar DANFSe** relê a nota no portal e monta o documento de novo. O PDF fica salvo em disco desde a emissão: baixar de novo entrega o mesmo arquivo, então depois de uma correção no layout é preciso regerar para o documento mudar.
 
 O número vem da **chave de acesso**, não da tela: pela regra de formação do leiaute (`TSIdNFSe`), a chave de 50 dígitos é `Cód.Mun.(7) + Amb.(1) + Tipo Insc.(1) + Inscrição(14) + Nº da NFS-e(13) + AAMM(4) + Cód.Num.(9) + DV(1)`. A tela pós-emissão nem sempre mostra o número em formato reconhecível, mas a chave sempre o carrega. Notas antigas que ficaram sem número são preenchidas na subida.
 
@@ -440,6 +440,12 @@ Batem exatamente com a referência: login (`#Inscricao`, `#Senha`, botão *Entra
 | `TributacaoFederal_ValorCP` | contribuição previdenciária; opcional |
 
 Uma diferença de comportamento deliberada: a base de cálculo de PIS/COFINS aqui é *valor − desconto incondicional*, enquanto a referência usa o valor cheio (ela não tem descontos).
+
+## Qual versão está no ar
+
+A Visão geral mostra **Build no ar**: um identificador calculado do conteúdo dos arquivos de código na subida do container. Ele também vem em `GET /api/health` e no log de inicialização.
+
+Serve para responder, sem adivinhação, se o deploy que está rodando já tem determinada correção — basta comparar o identificador do painel com o de um build local do mesmo commit.
 
 ## Atualizações do portal
 

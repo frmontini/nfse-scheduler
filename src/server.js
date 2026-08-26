@@ -68,7 +68,7 @@ app.use(express.json({ limit: '4mb' }));
 
 // Rotas públicas: healthcheck do Dokploy, tela e API de login, e os estáticos
 // (a tela de login precisa do CSS). O index.html fica atrás do guard.
-app.get('/api/health', (req, res) => res.json({ ok: true, version: '0.2.0', uptime: Math.round(process.uptime()) }));
+app.get('/api/health', (req, res) => res.json({ ok: true, version: '0.2.0', build: BUILD_ID, uptime: Math.round(process.uptime()) }));
 
 app.get('/login', (req, res) => {
   if (!session.authRequired() || session.currentUser(req)) return res.redirect('/');
@@ -114,6 +114,24 @@ const ASSETS_VERSION = crypto
   .digest('hex')
   .slice(0, 10);
 
+// Identidade do build: sem isso não dá para saber, olhando o painel, se o
+// deploy que está no ar é o do último push.
+const BUILD_ID = (() => {
+  const hash = crypto.createHash('sha1');
+  const varrer = (dir) => {
+    for (const item of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const alvo = path.join(dir, item.name);
+      if (item.isDirectory()) varrer(alvo);
+      else if (item.name.endsWith('.js')) hash.update(fs.readFileSync(alvo));
+    }
+  };
+  try {
+    varrer(path.join(process.cwd(), 'src'));
+    hash.update(fs.readFileSync(path.join(publicDir, 'app.js')));
+  } catch {}
+  return hash.digest('hex').slice(0, 7);
+})();
+
 const htmlCache = new Map();
 function sendHtml(res, file) {
   if (!htmlCache.has(file)) {
@@ -147,6 +165,7 @@ app.get('/api/status', (req, res) => {
     portalConfigured: Boolean(process.env.NFSE_LOGIN && process.env.NFSE_PASSWORD),
     mail: { provider: mailProvider(), label: providerLabel(), configured: mailConfigured(), from: mailFrom() },
     authRequired: session.authRequired(),
+    build: BUILD_ID,
     timezone: defaultTimezone(),
     dataPersistent: dataIsPersistent(),
     workerIntervalMinutes: intervalMinutes(),
@@ -275,5 +294,6 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`NFS-e Auto v0.2.0 em http://0.0.0.0:${port}`);
   console.log(`Banco: ${DB_PATH}`);
   console.log(`E-mail: ${providerLabel()}${mailConfigured() ? '' : ' (faltando configuração)'}`);
+  console.log(`Build: ${BUILD_ID}`);
   if (!process.env.APP_ADMIN_PASSWORD) console.warn('AVISO: APP_ADMIN_PASSWORD vazio. Não exponha esta porta à internet sem autenticação/reverse proxy.');
 });

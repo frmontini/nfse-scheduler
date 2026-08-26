@@ -195,6 +195,7 @@ function renderStats() {
     <div class="safety-row"><span>Ciclo do worker</span><strong>${humanInterval(state.status.workerIntervalMinutes)} · 1 nota por vez</strong></div>
     <div class="safety-row"><span>Portal</span>${state.status.portalConfigured ? '<span class="badge ok">Credenciais configuradas</span>' : '<span class="badge warn">Configurar .env</span>'}</div>
     <div class="safety-row"><span>E-mail</span>${state.status.mail.configured ? `<span class="badge ok">${esc(state.status.mail.label)}</span>` : `<span class="badge warn">${esc(state.status.mail.label)} · incompleto</span>`}</div>
+    <div class="safety-row"><span>Build no ar</span><strong class="mono" title="Muda a cada deploy com alteração de código">${esc(state.status.build || '—')}</strong></div>
     <div class="safety-row"><span>Aviso de envio</span>${em.notifyOnSent ? `<span class="badge ok">${esc(notifyModes[em.notifyMode] || 'Aviso separado')} → ${esc(notifyTarget)}</span>` : '<span class="badge neutral">Desligado</span>'}</div>`;
 }
 
