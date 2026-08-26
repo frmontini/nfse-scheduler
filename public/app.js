@@ -86,14 +86,26 @@ function fillAllForms() {
   fillForm($('#alertsForm'));
   fillForm($('#schedulerForm'));
   syncApproxFields();
+  syncIbsCbsFields();
   renderMailStatus();
 }
 
-// Cada modo do portal usa campos diferentes; mostrar só os que valem.
+// Cada modo do portal usa campos diferentes; mostrar só os que valem — e sem
+// deixar buraco na grade: o seletor ocupa meia linha quando está sozinho.
 function syncApproxFields() {
   const mode = $('#settingsForm [name="tax.approxMode"]').value;
-  $('#approxDetailFields').hidden = !['percent', 'value'].includes(mode);
+  const detalhado = ['percent', 'value'].includes(mode);
+  ['#approxFederalField', '#approxStateField', '#approxMunicipalField'].forEach((sel) => { $(sel).hidden = !detalhado; });
   $('#snRateField').hidden = mode !== 'sn';
+  $('#approxModeField').classList.toggle('span-2', !detalhado);
+}
+
+function syncIbsCbsFields() {
+  const ligado = $('#settingsForm [name="portal.fillIbsCbs"]').checked;
+  $('#ibsCbsFields').hidden = !ligado;
+  const badge = $('#ibsCbsState');
+  badge.textContent = ligado ? 'Ligado' : 'Desligado até 01/01/2027 (Simples)';
+  badge.className = `badge ${ligado ? 'warn' : 'neutral'}`;
 }
 
 function renderMailStatus() {
@@ -399,6 +411,7 @@ async function saveSettingsFrom(form, message) {
 }
 $('#settingsForm').addEventListener('submit',async(e)=>{e.preventDefault();try{await saveSettingsFrom(e.currentTarget,'Configurações salvas.');}catch(err){toast(err.message,true)}});
 $('#settingsForm [name="tax.approxMode"]').addEventListener('change',syncApproxFields);
+$('#settingsForm [name="portal.fillIbsCbs"]').addEventListener('change',syncIbsCbsFields);
 $('#alertsForm').addEventListener('submit',async(e)=>{e.preventDefault();try{await saveSettingsFrom(e.currentTarget,'Alertas salvos.');}catch(err){toast(err.message,true)}});
 $('#schedulerForm').addEventListener('submit',async(e)=>{e.preventDefault();try{await saveSettingsFrom(e.currentTarget,'Agendamento salvo.');$('#schedulerDialog').close();}catch(err){toast(err.message,true)}});
 

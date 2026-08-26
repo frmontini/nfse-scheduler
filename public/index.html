@@ -98,12 +98,14 @@
                 <label>Termo de busca do código<input name="portal.taxCodeSearch" placeholder="deduzido do código"></label>
               </div>
             </details>
-            <div class="toggle-row">
-              <label class="toggle"><input type="checkbox" name="portal.fillIbsCbs"><span></span>Preencher informações de IBS/CBS</label>
-              <label class="toggle"><input type="checkbox" name="portal.governmentPurchase"><span></span>É compra governamental</label>
-              <label class="toggle"><input type="checkbox" name="portal.recipientIsBuyer"><span></span>Destinatário é o próprio adquirente</label>
-            </div>
-            <div class="form-grid cols-2 detail-grid">
+            <div class="subcard">
+              <div class="subcard-head"><h3>IBS/CBS</h3><span class="badge neutral" id="ibsCbsState">—</span></div>
+              <div class="toggle-grid">
+                <label class="toggle"><input type="checkbox" name="portal.fillIbsCbs"><span></span>Preencher informações de IBS/CBS</label>
+                <label class="toggle"><input type="checkbox" name="portal.governmentPurchase"><span></span>É compra governamental</label>
+                <label class="toggle"><input type="checkbox" name="portal.recipientIsBuyer"><span></span>Destinatário é o próprio adquirente</label>
+              </div>
+              <div class="form-grid cols-2" id="ibsCbsFields" hidden>
               <label>Tipo de operação (IBS/CBS)<select name="portal.ibsCbsTipoOperacao">
                 <option value="1">1 - Fornecimento com pagamento posterior</option>
                 <option value="2">2 - Recebimento do pagamento com fornecimento já realizado</option>
@@ -140,7 +142,7 @@
                 <option value="100502">100502 - Demais bens móveis imateriais, inclusive direitos, em operações onerosas - Local do domicílio principal do destinatário residente ou domiciliado no País, caso o adquirente não seja residente ou domiciliado no País</option>
                 <option value="100601">100601 - Demais bens móveis imateriais, inclusive direitos, em operações não onerosas - Local do domicílio principal do destinatário residente ou domiciliado no País</option>
               </select><small>Define o local de incidência do IBS/CBS. Sem ele o portal não avança.</small></label>
-              <label class="span-2">Código de Situação Tributária do IBS/CBS<select name="portal.ibsCbsCst">
+              <label>Código de Situação Tributária do IBS/CBS<select name="portal.ibsCbsCst">
                 <option value="">— escolha com seu contador —</option>
                 <option value="000">000 - Tributação integral</option>
                 <option value="010">010 - Tributação com alíquotas uniformes</option>
@@ -161,7 +163,8 @@
                 <option value="820">820 - Tributação em documento específico</option>
                 <option value="830">830 - Exclusão de base de cálculo</option>
               </select></label>
-              <label class="span-2">Código de Classificação Tributária do IBS/CBS<input name="portal.ibsCbsClassTrib" placeholder="Ex.: 000001"><small>O portal filtra as opções pelo CST acima — <code>000001</code> é "situações tributadas integralmente". Confirme com seu contador.</small></label>
+              <label>Código de Classificação Tributária do IBS/CBS<input name="portal.ibsCbsClassTrib" placeholder="Ex.: 000001"><small>O portal filtra as opções pelo CST acima — <code>000001</code> é "situações tributadas integralmente". Confirme com seu contador.</small></label>
+              </div>
             </div>
             <div class="notice warning"><strong>IBS/CBS:</strong> desligado responde <strong>Não</strong> à pergunta do portal, que é o correto até a sua data de obrigatoriedade — Grupo 1 em 01/10/2026, Grupo 2 em 01/12/2026 e <strong>Simples Nacional em 01/01/2027</strong>. Ligado, a automação responde Sim e preenche as duas perguntas que o portal passa a exigir (compra governamental e destinatário/adquirente). Nesta fase o bloco é informativo, com alíquota-teste de 1% (0,1% IBS + 0,9% CBS), e a ausência não gera rejeição nem multa. <strong>Rode uma Prévia depois de ligar</strong>: o fluxo com IBS/CBS abre blocos extras na etapa Serviço que ainda não foram validados ponta a ponta.</div>
           </div>
@@ -231,18 +234,18 @@
               <label>IRRF (%)<input type="number" step="0.01" min="0" name="tax.irrfRate"></label>
               <label>CSLL (%)<input type="number" step="0.01" min="0" name="tax.csllRate"></label>
               <label>Contrib. previdenciária (%)<input type="number" step="0.01" min="0" name="tax.cpRate"></label>
-              <label class="span-2" id="snRateField">Alíquota do Simples Nacional (%)<input type="number" step="0.01" min="0" name="tax.snTotalRate"><small>Vai em <code>ValorTributos.AliquotaSN</code>; é o <code>pTotTribSN</code> do XML.</small></label>
-              <label class="span-2">Valor aproximado dos tributos<select name="tax.approxMode">
+            </div>
+            <div class="form-grid cols-4 detail-grid">
+              <label class="span-2" id="approxModeField">Valor aproximado dos tributos<select name="tax.approxMode">
                 <option value="sn">Informar alíquota do Simples Nacional</option>
                 <option value="percent">Configurar valores percentuais</option>
                 <option value="value">Preencher valores monetários</option>
                 <option value="none">Não informar (Decreto 8.264/2014)</option>
-              </select><small>Mesmas opções do portal. Optante do Simples usa a alíquota abaixo.</small></label>
-            </div>
-            <div class="form-grid cols-3 detail-grid" id="approxDetailFields" hidden>
-              <label>Federal<input type="number" step="0.01" min="0" name="tax.approxFederal"></label>
-              <label>Estadual<input type="number" step="0.01" min="0" name="tax.approxState"></label>
-              <label>Municipal<input type="number" step="0.01" min="0" name="tax.approxMunicipal"></label>
+              </select><small>Mesmas opções do portal.</small></label>
+              <label class="span-2" id="snRateField">Alíquota do Simples Nacional (%)<input type="number" step="0.01" min="0" name="tax.snTotalRate"><small>Vai em <code>ValorTributos.AliquotaSN</code>; é o <code>pTotTribSN</code> do XML.</small></label>
+              <label id="approxFederalField">Federal<input type="number" step="0.01" min="0" name="tax.approxFederal"></label>
+              <label id="approxStateField">Estadual<input type="number" step="0.01" min="0" name="tax.approxState"></label>
+              <label id="approxMunicipalField">Municipal<input type="number" step="0.01" min="0" name="tax.approxMunicipal"></label>
             </div>
             <div class="notice info">No Simples Nacional, campos federais que o Emissor Nacional deixar bloqueados/readonly são preservados: a automação só preenche o que estiver editável.</div>
           </div>
