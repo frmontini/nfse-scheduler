@@ -8,6 +8,7 @@ try {
   console.warn('Não foi possível carregar .env:', err.message);
 }
 
+const crypto = require('node:crypto');
 const express = require('express');
 const {
   DATA_DIR,
@@ -68,7 +69,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true, version: '0.2.0', upti
 
 app.get('/login', (req, res) => {
   if (!session.authRequired() || session.currentUser(req)) return res.redirect('/');
-  res.sendFile(path.join(publicDir, 'login.html'));
+  sendHtml(res, 'login.html');
 });
 
 app.post('/api/login', (req, res) => {
@@ -101,7 +102,31 @@ app.get('/api/session', (req, res) => {
   });
 });
 
-app.use(express.static(publicDir, { index: false }));
+// Assets ganham ?v=<hash do conteúdo>: depois de um deploy o navegador é
+// obrigado a buscar o CSS/JS novos, em vez de casar HTML novo com CSS velho.
+const ASSETS_VERSION = crypto
+  .createHash('sha1')
+  .update(fs.readFileSync(path.join(publicDir, 'app.js')))
+  .update(fs.readFileSync(path.join(publicDir, 'styles.css')))
+  .digest('hex')
+  .slice(0, 10);
+
+const htmlCache = new Map();
+function sendHtml(res, file) {
+  if (!htmlCache.has(file)) {
+    const html = fs.readFileSync(path.join(publicDir, file), 'utf8')
+      .replaceAll('/styles.css', `/styles.css?v=${ASSETS_VERSION}`)
+      .replaceAll('/app.js', `/app.js?v=${ASSETS_VERSION}`);
+    htmlCache.set(file, html);
+  }
+  res.set('Cache-Control', 'no-store').type('html').send(htmlCache.get(file));
+}
+
+app.use(express.static(publicDir, {
+  index: false,
+  // revalida sempre; com ETag a resposta vira 304 quando nada mudou
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache')
+}));
 
 app.use(session.guard);
 
@@ -218,7 +243,7 @@ app.post('/api/import-xml', (req, res, next) => {
 app.post('/api/test-email', asyncRoute(async (req, res) => res.json(await testMailer())));
 app.post('/api/run-now', asyncRoute(async (req, res) => res.json(await processDueAutomations({ manual: true }))));
 
-app.get('*', (req, res) => res.sendFile(path.join(publicDir, 'index.html')));
+app.get('*', (req, res) => sendHtml(res, 'index.html'));
 
 app.use((err, req, res, next) => {
   console.error(err);
