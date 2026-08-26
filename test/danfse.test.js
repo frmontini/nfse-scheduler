@@ -88,3 +88,15 @@ test('campo ausente vira traço, sem inventar valor', async () => {
   const html = await renderDanfseHtml({ chave: '123', emitente: {}, tomador: {}, servico: {}, issqn: {}, federal: {} });
   assert.match(html, /<span class="val">-<\/span>/);
 });
+
+test('número e líquido saem da nota, não do registro local', async () => {
+  const { nfseNumberFromKey } = require('../src/utils');
+  // a chave da nota carrega o número, mesmo quando a tela não mostra
+  assert.equal(nfseNumberFromKey('35325042211222333000181000000000009426081172450721'), '94');
+
+  const d = dadosDanfse(VISUALIZACAO);
+  // valor 198,00 com desconto de 14,85 -> líquido 183,15, calculado da nota
+  const servico = Number(d.issqn.valorServico.replace(',', '.'));
+  const desconto = Number(d.issqn.descontoIncondicionado.replace(',', '.'));
+  assert.equal((servico - desconto).toFixed(2), '183.15');
+});

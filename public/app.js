@@ -287,7 +287,7 @@ function renderHistory() {
   $('#historyTable').innerHTML = state.invoices.length ? state.invoices.map((i) => `<tr>
     <td>${esc(i.scheduled_date)}</td><td>${esc(i.competence)}</td><td>${esc(i.client_name)}</td><td>${money(i.value_cents)}</td><td>${badgeStatus(i.status)}</td>
     <td><div class="file-links">${botaoDanfse(i)}${i.xml_path ? `<a class="btn secondary small" href="/api/invoices/${i.id}/file/xml">XML</a>` : ''}</div></td>
-    <td><div class="actions"><button class="btn secondary small" onclick="showInvoice(${i.id})">Detalhes</button>${i.access_key ? `<a class="btn secondary small" href="https://www.nfse.gov.br/EmissorNacional/Notas/Visualizar/Index/${esc(i.access_key)}" target="_blank" rel="noopener" title="Abrir a nota no Emissor Nacional (para baixar XML/DANFSe oficiais)">Portal</a>` : ''}${i.status === 'DOCUMENT_ERROR' && i.access_key ? `<button class="btn secondary small" onclick="retryDocumentsAction(${i.id},this)">Documentos</button>` : ''}${['ISSUED','EMAIL_ERROR','DOCUMENT_ERROR'].includes(i.status) ? `<button class="btn secondary small" onclick="retryEmailAction(${i.id},this)">E-mail</button>` : ''}${i.status === 'ERROR_BEFORE_SUBMIT' ? `<button class="btn danger small" onclick="retryEmission(${i.id},this)">Tentar emissão</button>` : ''}</div></td>
+    <td><div class="actions"><button class="btn secondary small" onclick="showInvoice(${i.id})">Detalhes</button>${i.access_key ? `<a class="btn secondary small" href="https://www.nfse.gov.br/EmissorNacional/Notas/Visualizar/Index/${esc(i.access_key)}" target="_blank" rel="noopener" title="Abrir a nota no Emissor Nacional (para baixar XML/DANFSe oficiais)">Portal</a>` : ''}${i.access_key ? `<button class="btn secondary small" onclick="retryDocumentsAction(${i.id},this)" title="Lê a nota no portal e gera o DANFSe de novo">Gerar DANFSe</button>` : ''}${['ISSUED','EMAIL_ERROR','DOCUMENT_ERROR'].includes(i.status) ? `<button class="btn secondary small" onclick="retryEmailAction(${i.id},this)">E-mail</button>` : ''}${i.status === 'ERROR_BEFORE_SUBMIT' ? `<button class="btn danger small" onclick="retryEmission(${i.id},this)">Tentar emissão</button>` : ''}</div></td>
   </tr>`).join('') : '<tr><td colspan="7" class="empty">Sem histórico.</td></tr>';
 }
 
@@ -409,7 +409,7 @@ window.emitNow=async(id,botao)=>{
     await refreshAll();
   }catch(e){toast(e.message,true);showErrorEvidence(e.message);}
 };
-window.retryDocumentsAction=async(id,botao)=>{try{toast('Buscando XML e DANFSe no portal...',false,true);await comCarregando(botao,'Buscando...',()=>api(`/api/invoices/${id}/retry-documents`,{method:'POST',body:'{}'}));toast('Tentativa de recuperar documentos concluída.');await refreshAll();}catch(e){toast(e.message,true)}};
+window.retryDocumentsAction=async(id,botao)=>{try{toast('Lendo a nota no portal e gerando o DANFSe...',false,true);await comCarregando(botao,'Gerando...',()=>api(`/api/invoices/${id}/retry-documents`,{method:'POST',body:'{}'}));toast('DANFSe gerado a partir da nota no portal.');await refreshAll();}catch(e){toast(e.message,true)}};
 window.retryEmailAction=async(id,botao)=>{try{toast('Enviando o e-mail...',false,true);await comCarregando(botao,'Enviando...',()=>api(`/api/invoices/${id}/retry-email`,{method:'POST',body:'{}'}));toast('E-mail enviado.');await refreshAll();}catch(e){toast(e.message,true)}};
 window.retryEmission=async(id,botao)=>{
   if(!state.settings.scheduler.emissionEnabled){toast('Emissão real está bloqueada.',true);return;}

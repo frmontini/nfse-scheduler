@@ -87,7 +87,15 @@ async function archiveDocuments({ page, context, invoice, accessKey }) {
     const dados = dadosDanfse(await page.content());
     dados.numero = invoice.nfse_number || nfseNumberFromKey(accessKey) || dados.numero || '';
     dados.competencia = competenciaExtenso(invoice.competence);
-    dados.valorLiquido = dados.valorLiquido || moeda(liquido(invoice));
+    // Os valores vêm da nota no portal, não do que registramos aqui: se o
+    // portal arredondou ou ajustou algo, o documento tem que refletir a nota.
+    const servico = numeroBr(dados.issqn?.valorServico);
+    if (servico !== null) {
+      const abatimentos = numeroBr(dados.issqn?.descontoIncondicionado) + numeroBr(dados.issqn?.deducoes);
+      dados.valorLiquido = paraMoedaBr(servico - abatimentos);
+    } else {
+      dados.valorLiquido = moeda(liquido(invoice));
+    }
     dados.descontoCondicionado = moeda(invoice.discount_cond_cents);
     if (!dados.chave) dados.chave = accessKey;
 
@@ -101,6 +109,17 @@ async function archiveDocuments({ page, context, invoice, accessKey }) {
   }
 
   return result;
+}
+
+// "1.234,56" -> 1234.56
+function numeroBr(texto) {
+  const limpo = String(texto ?? '').replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
+  const n = Number(limpo);
+  return Number.isFinite(n) ? n : (texto === undefined || texto === null || texto === '' ? 0 : null);
+}
+
+function paraMoedaBr(valor) {
+  return Number(valor || 0).toFixed(2).replace('.', ',');
 }
 
 function moeda(cents) {

@@ -229,13 +229,17 @@ A *página* de visualização, por outro lado, abre normalmente pela sessão aut
 2. lê os campos da nota (prestador, tomador, serviço, ISSQN, federal, valores);
 3. monta o **DANFSe v2.0** e imprime em PDF com o Chromium.
 
-Isso é o que a **NT 008/2026** determina desde 01/07/2026: a API oficial de DANFSe foi descontinuada e quem emite gera o documento auxiliar localmente. O PDF sai em uma página A4, com QR Code apontando para `nfse.gov.br/ConsultaPublica/?tpc=1&chave=…`, e inclui o bloco de IBS/CBS do leiaute v2.0.
+Isso é o que a **NT 008/2026** determina desde 01/07/2026: a API oficial de DANFSe foi descontinuada e quem emite gera o documento auxiliar localmente.
+
+Os valores impressos saem da **nota no portal**, não do que está registrado aqui — se o portal arredondar ou ajustar algo, o documento reflete a nota. O PDF sai em uma página A4, com QR Code apontando para `nfse.gov.br/ConsultaPublica/?tpc=1&chave=…`, e inclui o bloco de IBS/CBS do leiaute v2.0.
 
 O **XML** continua só no portal: o histórico tem um botão **Portal**, que abre a nota para você baixá-lo à mão quando precisar. Isso é registrado como observação da nota, não como erro — não há o que corrigir no sistema.
 
 O layout fica em `src/danfse.js` e a leitura da visualização em `src/danfse-parse.js`.
 
 Nas tabelas não existe coluna com o número da NFS-e: o que interessa no dia a dia é o documento, que abre em um visualizador dentro do painel (com botões de baixar e abrir em nova aba). O número continua nos *Detalhes* da nota e impresso no próprio DANFSe.
+
+No Histórico, **Gerar DANFSe** relê a nota no portal e monta o documento de novo — útil quando o layout melhora ou quando a nota foi emitida por uma versão antiga.
 
 O número vem da **chave de acesso**, não da tela: pela regra de formação do leiaute (`TSIdNFSe`), a chave de 50 dígitos é `Cód.Mun.(7) + Amb.(1) + Tipo Insc.(1) + Inscrição(14) + Nº da NFS-e(13) + AAMM(4) + Cód.Num.(9) + DV(1)`. A tela pós-emissão nem sempre mostra o número em formato reconhecível, mas a chave sempre o carrega. Notas antigas que ficaram sem número são preenchidas na subida.
 
