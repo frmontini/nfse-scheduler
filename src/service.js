@@ -25,7 +25,10 @@ function dueInfo(automation, ctx) {
   const day = scheduledDay(ctx.year, ctx.month, automation.day_of_month);
   const scheduledDate = `${ctx.year}-${String(ctx.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   const competence = competenceFor(ctx);
-  return { day, scheduledDate, competence, due: ctx.day >= day };
+  // Cadastrar hoje uma automação que começa no mês que vem não pode disparar
+  // a competência atual: a data agendada precisa alcançar a primeira emissão.
+  const comecou = !automation.start_date || scheduledDate >= automation.start_date;
+  return { day, scheduledDate, competence, startDate: automation.start_date || null, due: comecou && ctx.day >= day };
 }
 
 function ensureInvoiceForAutomation(automation, ctx, { ignoreDue = false } = {}) {

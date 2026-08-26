@@ -56,3 +56,26 @@ test('data de competência do portal é a data de hoje no fuso configurado', () 
   assert.equal(todayPtBr('America/Sao_Paulo', new Date('2026-08-26T12:00:00Z')), '26/08/2026');
   assert.match(todayPtBr('America/Sao_Paulo'), /^\d{2}\/\d{2}\/\d{4}$/);
 });
+
+test('automação só vence a partir da data da primeira emissão', () => {
+  const Module = require('node:module');
+  const originalLoad = Module._load;
+  Module._load = function (request, ...rest) {
+    if (request === './db') return { getSettings: () => ({ scheduler: {} }), listAutomations: () => [], getAutomation: () => null, getInvoice: () => null, getInvoiceByAutomationCompetence: () => null, createInvoice: () => null, updateInvoice: () => null, addInvoiceEvent: () => null, listRetryableDocuments: () => [], listRetryableEmails: () => [] };
+    if (request === './emitter/national') return { previewInvoice: async () => ({}), issueInvoice: async () => ({}), retrieveDocuments: async () => ({}) };
+    if (request === './email') return { sendInvoiceEmail: async () => ({}) };
+    return originalLoad.call(this, request, ...rest);
+  };
+  const { dueInfo } = require('../src/service');
+  Module._load = originalLoad;
+
+  const hoje = { year: 2026, month: 8, day: 26 };
+  const so_mes_que_vem = { day_of_month: 5, start_date: '2026-09-05' };
+  const ja_valendo = { day_of_month: 5, start_date: '2026-08-05' };
+  const sem_data = { day_of_month: 5 };
+
+  assert.equal(dueInfo(so_mes_que_vem, hoje).due, false, 'cadastrada hoje para setembro não pode emitir agosto');
+  assert.equal(dueInfo(so_mes_que_vem, { year: 2026, month: 9, day: 5 }).due, true, 'em setembro, no dia, vence');
+  assert.equal(dueInfo(ja_valendo, hoje).due, true);
+  assert.equal(dueInfo(sem_data, hoje).due, true, 'automação antiga sem data segue como antes');
+});

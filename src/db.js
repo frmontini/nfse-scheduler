@@ -159,6 +159,7 @@ function migrate() {
       name TEXT NOT NULL,
       enabled INTEGER NOT NULL DEFAULT 1,
       day_of_month INTEGER NOT NULL CHECK (day_of_month BETWEEN 1 AND 31),
+      start_date TEXT,
       value_cents INTEGER NOT NULL CHECK (value_cents > 0),
       discount_incond_cents INTEGER NOT NULL DEFAULT 0 CHECK (discount_incond_cents >= 0),
       discount_cond_cents INTEGER NOT NULL DEFAULT 0 CHECK (discount_cond_cents >= 0),
@@ -217,6 +218,10 @@ function migrate() {
     CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
     CREATE INDEX IF NOT EXISTS idx_invoices_competence ON invoices(competence);
   `);
+
+  // Bancos criados antes da v0.3 não têm start_date.
+  const colunas = db.prepare('PRAGMA table_info(automations)').all().map((c) => c.name);
+  if (!colunas.includes('start_date')) db.exec('ALTER TABLE automations ADD COLUMN start_date TEXT');
 
   const row = db.prepare('SELECT data FROM settings WHERE id = 1').get();
   if (!row) {
@@ -339,8 +344,20 @@ function getAutomation(id) {
   `).get(Number(id)));
 }
 
+// A automação passa a ser cadastrada pela data da primeira emissão: o dia do
+// mês sai dela, e nada é emitido antes dessa data — assim dá para cadastrar
+// hoje uma recorrência que só começa no mês que vem.
+function normalizeStartDate(value) {
+  const texto = String(value || '').trim();
+  if (!texto) return null;
+  const m = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) throw new Error('Data da primeira emissão inválida. Use o formato AAAA-MM-DD.');
+  return `${m[1]}-${m[2]}-${m[3]}`;
+}
+
 function validateAutomationInput(input) {
-  const day = Number(input.dayOfMonth ?? input.day_of_month);
+  const startDate = normalizeStartDate(input.startDate ?? input.start_date);
+  const day = startDate ? Number(startDate.slice(8, 10)) : Number(input.dayOfMonth ?? input.day_of_month);
   const valueCents = Number(input.valueCents ?? input.value_cents);
   const discountIncondCents = Number(input.discountIncondCents ?? input.discount_incond_cents ?? 0);
   const discountCondCents = Number(input.discountCondCents ?? input.discount_cond_cents ?? 0);
@@ -348,7 +365,7 @@ function validateAutomationInput(input) {
   if (!Number.isInteger(valueCents) || valueCents <= 0) throw new Error('Valor deve ser maior que zero.');
   if (discountIncondCents < 0 || discountCondCents < 0) throw new Error('Descontos não podem ser negativos.');
   if (discountIncondCents + discountCondCents >= valueCents) throw new Error('A soma dos descontos deve ser menor que o valor do serviço.');
-  return { day, valueCents, discountIncondCents, discountCondCents };
+  return { day, valueCents, discountIncondCents, discountCondCents, startDate };
 }
 
 function createAutomation(input) {
@@ -356,15 +373,16 @@ function createAutomation(input) {
   const ts = nowIso();
   const result = db.prepare(`
     INSERT INTO automations(
-      client_id, name, enabled, day_of_month, value_cents, discount_incond_cents, discount_cond_cents,
+      client_id, name, enabled, day_of_month, start_date, value_cents, discount_incond_cents, discount_cond_cents,
       service_description, municipality_search, municipality_name, tax_code_search, tax_code_name,
       email_enabled, overrides_json, created_at, updated_at
-    ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     Number(input.clientId ?? input.client_id),
     String(input.name || '').trim(),
     input.enabled === false ? 0 : 1,
     v.day,
+    v.startDate,
     v.valueCents,
     v.discountIncondCents,
     v.discountCondCents,
@@ -389,6 +407,7 @@ function updateAutomation(id, input) {
     name: input.name ?? current.name,
     enabled: input.enabled ?? current.enabled,
     dayOfMonth: input.dayOfMonth ?? current.day_of_month,
+    startDate: input.startDate ?? current.start_date,
     valueCents: input.valueCents ?? current.value_cents,
     discountIncondCents: input.discountIncondCents ?? current.discount_incond_cents,
     discountCondCents: input.discountCondCents ?? current.discount_cond_cents,
@@ -403,13 +422,13 @@ function updateAutomation(id, input) {
   const v = validateAutomationInput(merged);
   db.prepare(`
     UPDATE automations SET
-      client_id = ?, name = ?, enabled = ?, day_of_month = ?, value_cents = ?, discount_incond_cents = ?, discount_cond_cents = ?,
+      client_id = ?, name = ?, enabled = ?, day_of_month = ?, start_date = ?, value_cents = ?, discount_incond_cents = ?, discount_cond_cents = ?,
       service_description = ?, municipality_search = ?, municipality_name = ?, tax_code_search = ?, tax_code_name = ?,
       email_enabled = ?, overrides_json = ?, updated_at = ?
     WHERE id = ?
   `).run(
     Number(merged.clientId), String(merged.name).trim(), merged.enabled ? 1 : 0,
-    v.day, v.valueCents, v.discountIncondCents, v.discountCondCents,
+    v.day, v.startDate, v.valueCents, v.discountIncondCents, v.discountCondCents,
     String(merged.serviceDescription || '').trim() || null,
     String(merged.municipalitySearch || '').trim() || null,
     String(merged.municipalityName || '').trim() || null,

@@ -235,7 +235,7 @@ function renderClients() {
 function automationCard(a) {
   return `<div class="automation-card">
     <div><div class="automation-title"><h3>${esc(a.name)}</h3>${a.enabled ? '<span class="badge ok">Ativa</span>' : '<span class="badge neutral">Pausada</span>'}</div>
-      <div class="automation-meta"><span>Dia ${a.day_of_month}</span><span>${money(a.value_cents)}</span>${a.discount_incond_cents ? `<span class="tag-discount">Desc. incond. ${money(a.discount_incond_cents)}</span>` : ''}${a.discount_cond_cents ? `<span class="tag-discount">Desc. cond. ${money(a.discount_cond_cents)}</span>` : ''}${a.email_enabled ? '<span>E-mail</span>' : ''}</div>
+      <div class="automation-meta"><span>Todo dia ${a.day_of_month}</span>${a.start_date ? `<span>a partir de ${esc(a.start_date.split('-').reverse().join('/'))}</span>` : ''}<span>${money(a.value_cents)}</span>${a.discount_incond_cents ? `<span class="tag-discount">Desc. incond. ${money(a.discount_incond_cents)}</span>` : ''}${a.discount_cond_cents ? `<span class="tag-discount">Desc. cond. ${money(a.discount_cond_cents)}</span>` : ''}${a.email_enabled ? '<span>E-mail</span>' : ''}</div>
     </div>
     <div class="actions"><button class="btn secondary small" onclick="previewAutomationAction(${a.id},this)">Prévia</button><button class="btn secondary small" onclick="editAutomation(${a.id})">Editar</button><button class="btn secondary small" onclick="duplicateAutomation(${a.id})">Duplicar</button><button class="btn secondary small" onclick="toggleAutomation(${a.id},${!a.enabled})">${a.enabled ? 'Pausar' : 'Ativar'}</button><button class="btn danger small" onclick="emitNow(${a.id},this)">Emitir agora</button></div>
   </div>`;
@@ -308,7 +308,8 @@ function openNewClient() { const f=$('#clientForm'); f.reset(); f.id.value=''; f
 window.editAutomation = function(id) {
   const a = state.automations.find((x) => x.id === id); if (!a) return;
   const f = $('#automationForm'); f.reset();
-  f.id.value=a.id; f.name.value=a.name; f.clientId.value=a.client_id; f.dayOfMonth.value=a.day_of_month;
+  f.id.value=a.id; f.name.value=a.name; f.clientId.value=a.client_id;
+  f.startDate.value=a.start_date || proximaData(a.day_of_month);
   f.value.value=(a.value_cents/100).toFixed(2); f.discountIncond.value=(a.discount_incond_cents/100).toFixed(2); f.discountCond.value=(a.discount_cond_cents/100).toFixed(2);
   f.enabled.checked=a.enabled; f.emailEnabled.checked=a.email_enabled; f.serviceDescription.value=a.service_description||''; f.municipalitySearch.value=a.municipality_search||''; f.municipalityName.value=a.municipality_name||''; f.taxCodeSearch.value=a.tax_code_search||''; f.taxCodeName.value=a.tax_code_name||'';
   $$('[data-override]',f).forEach((el)=>{el.checked=false}); $$('[data-override-number]',f).forEach((el)=>el.value='');
@@ -316,6 +317,16 @@ window.editAutomation = function(id) {
   $('#automationImportResult').hidden=true;
   $('#automationDialogTitle').textContent='Editar automação'; $('#automationDialog').showModal();
 };
+// Sugere a próxima ocorrência desse dia: se já passou no mês, joga para o mês seguinte.
+function proximaData(dia) {
+  const hoje = new Date();
+  const d = Math.min(Number(dia) || 1, 28);
+  let ano = hoje.getFullYear();
+  let mes = hoje.getMonth();
+  if (hoje.getDate() > d) { mes += 1; if (mes > 11) { mes = 0; ano += 1; } }
+  return `${ano}-${String(mes + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
 window.duplicateAutomation = function(id) {
   const a = state.automations.find((x) => x.id === id); if (!a) return;
   window.editAutomation(id);
@@ -335,7 +346,7 @@ window.newAutomationFor = function(clientId) {
   f.name.focus();
 };
 
-function openNewAutomation(){ const f=$('#automationForm'); f.reset(); f.id.value=''; $('#automationImportResult').hidden=true; f.dayOfMonth.value=1; f.discountIncond.value='0'; f.discountCond.value='0'; f.enabled.checked=true; f.emailEnabled.checked=true; $('#automationDialogTitle').textContent='Nova automação'; $('#automationDialog').showModal(); }
+function openNewAutomation(){ const f=$('#automationForm'); f.reset(); f.id.value=''; $('#automationImportResult').hidden=true; f.startDate.value=proximaData(new Date().getDate()); f.discountIncond.value='0'; f.discountCond.value='0'; f.enabled.checked=true; f.emailEnabled.checked=true; $('#automationDialogTitle').textContent='Nova automação'; $('#automationDialog').showModal(); }
 
 window.toggleAutomation=async(id,enabled)=>{try{await api(`/api/automations/${id}/toggle`,{method:'POST',body:JSON.stringify({enabled})});toast(enabled?'Automação ativada.':'Automação pausada.');await refreshAll();}catch(e){toast(e.message,true)}};
 window.previewAutomationAction=async(id,botao)=>{
@@ -514,7 +525,7 @@ $('#registerForm').addEventListener('submit',async(e)=>{
 
 $('#clientForm').addEventListener('submit',async(e)=>{e.preventDefault();const f=e.currentTarget;const payload={name:f.name.value,type:f.type.value,document:f.document.value,email:f.email.value,active:f.active.checked};try{if(f.id.value)await api(`/api/clients/${f.id.value}`,{method:'PUT',body:JSON.stringify(payload)});else await api('/api/clients',{method:'POST',body:JSON.stringify(payload)});$('#clientDialog').close();toast('Cliente salvo.');await refreshAll();}catch(err){toast(err.message,true)}});
 
-$('#automationForm').addEventListener('submit',async(e)=>{e.preventDefault();const f=e.currentTarget;const overrides={};$$('[data-override]',f).forEach((el)=>{if(el.checked)overrides[el.dataset.override]=true});$$('[data-override-number]',f).forEach((el)=>{if(el.value!=='')overrides[el.dataset.overrideNumber]=Number(el.value)});const payload={name:f.name.value,clientId:Number(f.clientId.value),dayOfMonth:Number(f.dayOfMonth.value),valueCents:cents(f.value.value),discountIncondCents:cents(f.discountIncond.value),discountCondCents:cents(f.discountCond.value),enabled:f.enabled.checked,emailEnabled:f.emailEnabled.checked,serviceDescription:f.serviceDescription.value,municipalitySearch:f.municipalitySearch.value,municipalityName:f.municipalityName.value,taxCodeSearch:f.taxCodeSearch.value,taxCodeName:f.taxCodeName.value,overrides};try{if(f.id.value)await api(`/api/automations/${f.id.value}`,{method:'PUT',body:JSON.stringify(payload)});else await api('/api/automations',{method:'POST',body:JSON.stringify(payload)});$('#automationDialog').close();toast('Automação salva.');await refreshAll();}catch(err){toast(err.message,true)}});
+$('#automationForm').addEventListener('submit',async(e)=>{e.preventDefault();const f=e.currentTarget;const overrides={};$$('[data-override]',f).forEach((el)=>{if(el.checked)overrides[el.dataset.override]=true});$$('[data-override-number]',f).forEach((el)=>{if(el.value!=='')overrides[el.dataset.overrideNumber]=Number(el.value)});const payload={name:f.name.value,clientId:Number(f.clientId.value),startDate:f.startDate.value,valueCents:cents(f.value.value),discountIncondCents:cents(f.discountIncond.value),discountCondCents:cents(f.discountCond.value),enabled:f.enabled.checked,emailEnabled:f.emailEnabled.checked,serviceDescription:f.serviceDescription.value,municipalitySearch:f.municipalitySearch.value,municipalityName:f.municipalityName.value,taxCodeSearch:f.taxCodeSearch.value,taxCodeName:f.taxCodeName.value,overrides};try{if(f.id.value)await api(`/api/automations/${f.id.value}`,{method:'PUT',body:JSON.stringify(payload)});else await api('/api/automations',{method:'POST',body:JSON.stringify(payload)});$('#automationDialog').close();toast('Automação salva.');await refreshAll();}catch(err){toast(err.message,true)}});
 
 async function saveSettingsFrom(form, message) {
   state.settings = await api('/api/settings', { method: 'PUT', body: JSON.stringify(collectForm(form)) });
@@ -553,7 +564,7 @@ $('#automationXmlInput').addEventListener('change',async(event)=>{
     if(v.discountCondCents)notas.push(`desc. condicionado ${money(v.discountCondCents)}`);
 
     const dia=String(r.source?.issuedAt||'').match(/^\d{4}-\d{2}-(\d{2})/)?.[1];
-    if(dia){f.dayOfMonth.value=String(Number(dia));notas.push(`dia ${Number(dia)} (data da nota)`);}
+    if(dia){f.startDate.value=proximaData(Number(dia));notas.push(`primeira emissão em ${f.startDate.value.split('-').reverse().join('/')} (dia da nota)`);}
     if(sug.serviceDescription){f.serviceDescription.value=sug.serviceDescription;notas.push('descrição do serviço');}
     if(!f.name.value&&r.client?.name)f.name.value=r.client.name;
 

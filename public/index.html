@@ -445,7 +445,7 @@
       <div class="form-grid cols-2">
         <label>Nome da automação<input name="name" required placeholder="Mensalidade Cliente X"></label>
         <label>Cliente<select name="clientId" required></select></label>
-        <label>Dia do mês<input type="number" min="1" max="31" name="dayOfMonth" required></label>
+        <label>Primeira emissão<input type="date" name="startDate" required><small>O dia do mês vem daqui. Nada é emitido antes desta data — para começar só no mês que vem, escolha uma data do mês que vem.</small></label>
         <label>Valor do serviço (R$)<input type="number" min="0.01" step="0.01" name="value" required></label>
         <label>Desconto incondicional (R$)<input type="number" min="0" step="0.01" name="discountIncond" value="0"></label>
         <label>Desconto condicionado (R$)<input type="number" min="0" step="0.01" name="discountCond" value="0"></label>

@@ -35,7 +35,7 @@ Também foram usados como referência de arquitetura/comportamento:
   - tributos aproximados federal/estadual/municipal.
 - Cadastro de clientes PJ/PF.
 - Automações mensais por cliente:
-  - dia do mês;
+  - data da primeira emissão (o dia do mês vem dela, e nada sai antes);
   - valor do serviço;
   - **desconto incondicional**;
   - desconto condicionado;
@@ -187,6 +187,14 @@ Não há mais escolha de *mês atual / mês anterior*: como a data enviada ao po
 Se uma nota saiu no portal mas não consta aqui — banco recriado sem volume, emissão feita à mão, migração de outro sistema —, use **Registrar nota já emitida**, no Histórico. Informe a automação, a competência e, se quiser, número e chave.
 
 Isso não emite nada: grava a nota como `ISSUED` naquela competência. É o que devolve a proteção contra duplicidade — sem o registro, o worker enxerga a competência em aberto e emite uma segunda nota no ciclo seguinte.
+
+## Quando a automação começa
+
+A automação é cadastrada pela **data da primeira emissão**, num seletor de data. O dia do mês da recorrência sai dessa data, e **nada é emitido antes dela**.
+
+Serve para cadastrar hoje uma recorrência que só deve começar depois: uma automação criada em 26/08 com primeira emissão em 05/09 não toca na competência de agosto — o worker só a considera vencida quando a data agendada do mês alcança a data de início. É o caminho para recadastrar um cliente cuja nota do mês já saiu, sem risco de emitir a segunda.
+
+Automações antigas, sem data de início, continuam funcionando como antes.
 
 ## Segurança contra nota duplicada
 
