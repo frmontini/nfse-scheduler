@@ -1,5 +1,11 @@
 FROM mcr.microsoft.com/playwright:v1.61.1-noble
 
+# tini vira o PID 1 e recolhe os processos do Chromium. Sem isso cada emissão
+# deixa processos zumbis, e no Dokploy (modo Dockerfile) não há init: true.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tini \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY package.json ./
@@ -20,4 +26,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "--experimental-sqlite", "src/server.js"]

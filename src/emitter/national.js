@@ -314,7 +314,13 @@ async function fillTax(page, data) {
 function launchOptions() {
   const headless = String(process.env.PLAYWRIGHT_HEADLESS ?? 'true').toLowerCase() !== 'false';
   const slowMo = Number(process.env.BROWSER_SLOW_MO_MS || 0);
-  return { headless, slowMo: Number.isFinite(slowMo) ? slowMo : 0 };
+  return {
+    headless,
+    slowMo: Number.isFinite(slowMo) ? slowMo : 0,
+    // Container sem shm_size grande (padrão de 64 MB) derruba o Chromium no meio
+    // do formulário; com esta flag ele usa /tmp e não depende disso.
+    args: ['--disable-dev-shm-usage']
+  };
 }
 
 // Falha no preenchimento vira evidência em disco: sem isso, quando o portal

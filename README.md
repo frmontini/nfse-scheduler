@@ -272,18 +272,27 @@ Os dados ficam no diretório `./data`, montado como volume/bind mount, portanto 
 
 ## Deploy no Dokploy
 
-Use o arquivo `docker-compose.dokploy.yml`. Ele difere do compose local em três pontos: não publica portas (quem entrega é o Traefik do Dokploy), guarda `/data` em **volume nomeado** em vez de bind mount, e declara a rede externa `dokploy-network`, que é por onde o Traefik alcança o container.
+O Dokploy roda este projeto pelo **Dockerfile da raiz** — não há compose para produção, porque tudo que um compose faria já está no próprio Dockerfile e no código:
 
-1. No Dokploy: **Create Service → Compose**, aponte para o repositório e defina `docker-compose.dokploy.yml` como Compose Path.
-2. Na aba **Environment**, cole o conteúdo do `.env.example` já preenchido. Em produção o `APP_ADMIN_PASSWORD` é **obrigatório**: sem ele o processo encerra na subida, porque o painel emite nota fiscal e ficaria aberto na internet. Se o painel já estiver atrás de outra proteção, `ALLOW_NO_AUTH=1` desliga essa exigência.
-3. Na aba **Domains**, aponte seu domínio para o serviço `nfse-auto`, porta `3000`, com HTTPS ligado.
-4. Deploy. O healthcheck bate em `/api/health` (rota pública, sem Basic Auth, sem dado sensível) — é o que o Dokploy usa para saber que subiu.
+| Necessidade | Onde é resolvida |
+| --- | --- |
+| Recolher os processos do Chromium | `tini` como `ENTRYPOINT` (equivale ao `init: true`) |
+| Chromium com `/dev/shm` de 64 MB | flag `--disable-dev-shm-usage` no launch (dispensa `shm_size`) |
+| Saber que subiu | `HEALTHCHECK` em `/api/health` |
+| Persistência | volume montado em `/data` pela UI |
 
-O volume `nfse-data` guarda `nfse.sqlite`, PDFs/XML e screenshots: **não apague o volume em redeploy**, senão perde histórico e a proteção de duplicidade por `automação + competência`.
+Passo a passo:
 
-Rodando atrás do Traefik, o app já usa `trust proxy` (desligue com `TRUST_PROXY=0` se algum dia servir direto).
+1. **Create Service → Application**, apontando para o repositório e a branch `main`.
+2. **Build Type: Dockerfile** (o da raiz).
+3. **Environment**: cole o conteúdo do `.env.example` já preenchido. `APP_ADMIN_PASSWORD` é obrigatório: com `NODE_ENV=production` e sem senha, o processo encerra na subida em vez de abrir o painel na internet. Use `ALLOW_NO_AUTH=1` só se houver outra proteção na frente.
+4. **Mounts / Volumes**: monte um volume em **`/data`**. É onde ficam `nfse.sqlite`, PDFs/XML e screenshots — sem ele, cada redeploy começa do zero e a proteção de duplicidade por `automação + competência` perde a memória.
+5. **Domains**: seu domínio apontando para a porta **3000**, com HTTPS.
+6. Deploy.
 
-Para testar na sua máquina antes, o `docker-compose.yml` normal continua valendo: bind mount em `./data` e porta `3000` publicada.
+Rodando atrás do Traefik, o app já usa `trust proxy` (desligue com `TRUST_PROXY=0` se um dia servir direto).
+
+O `docker-compose.yml` da raiz continua servindo para testar na sua máquina: bind mount em `./data`, porta 3000 publicada e `init: true`.
 
 ## Primeiro uso recomendado
 
