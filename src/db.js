@@ -223,6 +223,16 @@ function migrate() {
   const colunas = db.prepare('PRAGMA table_info(automations)').all().map((c) => c.name);
   if (!colunas.includes('start_date')) db.exec('ALTER TABLE automations ADD COLUMN start_date TEXT');
 
+  // Notas emitidas antes de o número ser extraído da chave ficaram sem ele.
+  db.exec(`
+    UPDATE invoices
+       SET nfse_number = CAST(substr(access_key, 24, 13) AS INTEGER)
+     WHERE nfse_number IS NULL
+       AND access_key IS NOT NULL
+       AND length(access_key) = 50
+       AND CAST(substr(access_key, 24, 13) AS INTEGER) > 0;
+  `);
+
   const row = db.prepare('SELECT data FROM settings WHERE id = 1').get();
   if (!row) {
     db.prepare('INSERT INTO settings(id, data, updated_at) VALUES(1, ?, ?)')

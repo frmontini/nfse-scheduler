@@ -79,3 +79,13 @@ test('automação só vence a partir da data da primeira emissão', () => {
   assert.equal(dueInfo(ja_valendo, hoje).due, true);
   assert.equal(dueInfo(sem_data, hoje).due, true, 'automação antiga sem data segue como antes');
 });
+
+test('número da NFS-e sai da chave de acesso', () => {
+  const { nfseNumberFromKey } = require('../src/utils');
+  // Mun(7)+Amb(1)+TpInsc(1)+Inscrição(14)+Nº(13)+AAMM(4)+CodNum(9)+DV(1)
+  assert.equal(nfseNumberFromKey('35325042211222333000181000000000009326083197738985'), '93');
+  assert.equal(nfseNumberFromKey('35325042211222333000181000000000009426081172450721'), '94');
+  assert.equal(nfseNumberFromKey('3532 5042 2112 2233 3000 1810 0000 0000 0093 2608 3197 7389 85'), '93', 'aceita a chave formatada');
+  assert.equal(nfseNumberFromKey('123'), null, 'chave curta não vira número');
+  assert.equal(nfseNumberFromKey(null), null);
+});

@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { DATA_DIR } = require('../db');
 const { baseUrl } = require('./auth');
-const { safeFilename, competenceParts, MONTHS_PT } = require('../utils');
+const { safeFilename, competenceParts, MONTHS_PT, nfseNumberFromKey } = require('../utils');
 const { dadosDanfse } = require('../danfse-parse');
 const { renderDanfseHtml } = require('../danfse');
 
@@ -32,9 +32,11 @@ async function discoverMetadata(page) {
     const m = h.match(/Visualizar\/Index\/(\d{44,60})/i);
     return m?.[1];
   }).find(Boolean);
+  const accessKey = fromHref || extractAccessKey(body);
   return {
-    accessKey: fromHref || extractAccessKey(body),
-    nfseNumber: extractNfseNumber(body),
+    accessKey,
+    // O texto da tela nem sempre traz o número; a chave sempre traz.
+    nfseNumber: extractNfseNumber(body) || nfseNumberFromKey(accessKey),
     issueUrl: page.url(),
     bodyText: body
   };
@@ -83,7 +85,7 @@ async function archiveDocuments({ page, context, invoice, accessKey }) {
   const pdfPath = path.join(dir, `${safeFilename(accessKey)}-danfse.pdf`);
   try {
     const dados = dadosDanfse(await page.content());
-    dados.numero = invoice.nfse_number || dados.numero || '';
+    dados.numero = invoice.nfse_number || nfseNumberFromKey(accessKey) || dados.numero || '';
     dados.competencia = competenciaExtenso(invoice.competence);
     dados.valorLiquido = dados.valorLiquido || moeda(liquido(invoice));
     dados.descontoCondicionado = moeda(invoice.discount_cond_cents);

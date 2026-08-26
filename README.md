@@ -237,6 +237,8 @@ O layout fica em `src/danfse.js` e a leitura da visualização em `src/danfse-pa
 
 Nas tabelas não existe coluna com o número da NFS-e: o que interessa no dia a dia é o documento, que abre em um visualizador dentro do painel (com botões de baixar e abrir em nova aba). O número continua nos *Detalhes* da nota e impresso no próprio DANFSe.
 
+O número vem da **chave de acesso**, não da tela: pela regra de formação do leiaute (`TSIdNFSe`), a chave de 50 dígitos é `Cód.Mun.(7) + Amb.(1) + Tipo Insc.(1) + Inscrição(14) + Nº da NFS-e(13) + AAMM(4) + Cód.Num.(9) + DV(1)`. A tela pós-emissão nem sempre mostra o número em formato reconhecível, mas a chave sempre o carrega. Notas antigas que ficaram sem número são preenchidas na subida.
+
 ## Acesso ao painel
 
 O painel tem tela de login própria (`/login`). A sessão é um cookie `HttpOnly` assinado com HMAC-SHA256, válido por 12 horas (`APP_SESSION_HOURS`), com `Secure` automático atrás de HTTPS. O segredo da assinatura sai de `APP_SESSION_SECRET` ou, na falta dele, da própria senha do painel — **trocar `APP_ADMIN_PASSWORD` derruba as sessões abertas**.

@@ -106,6 +106,16 @@ function searchTermFor(name) {
   return raw.replace(/\s*[/-]\s*[A-Z]{2}$/, '').trim();
 }
 
+// Regra de formação da chave (TSIdNFSe, leiaute nacional):
+// Cód.Mun.(7) + Amb.(1) + Tipo Insc.(1) + Inscrição(14) + Nº NFS-e(13) + AAMM(4) + Cód.Num.(9) + DV(1)
+// O portal não mostra o número na visualização, mas ele está aqui.
+function nfseNumberFromKey(chave) {
+  const d = digits(chave);
+  if (d.length !== 50) return null;
+  const numero = Number(d.slice(23, 36));
+  return Number.isFinite(numero) && numero > 0 ? String(numero) : null;
+}
+
 function safeFilename(value) {
   return String(value || 'arquivo')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -129,6 +139,7 @@ module.exports = {
   todayPtBr,
   formatDateTimePtBr,
   parseEmailList,
+  nfseNumberFromKey,
   renderTemplate,
   searchTermFor,
   safeFilename
