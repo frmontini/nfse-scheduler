@@ -33,6 +33,7 @@ const {
   getDashboardCounts
 } = require('./db');
 const {
+  listPending,
   processDueAutomations,
   previewAutomation,
   runAutomationNow,
@@ -200,6 +201,7 @@ app.post('/api/automations/:id/run', asyncRoute(async (req, res) => {
   res.json(item);
 }));
 
+app.get('/api/pending', (req, res) => res.json(listPending()));
 app.get('/api/invoices', (req, res) => res.json(listInvoices(Math.min(Number(req.query.limit || 200), 1000))));
 app.get('/api/invoices/:id', (req, res) => {
   const item = getInvoice(req.params.id);
@@ -231,6 +233,12 @@ app.get('/api/invoices/:id/file/:kind', (req, res) => {
   const resolved = path.resolve(target);
   const allowed = path.resolve(path.join(DATA_DIR, 'files')) + path.sep;
   if (!resolved.startsWith(allowed)) return res.status(403).send('Caminho inválido.');
+  // ?inline=1 abre o documento no visualizador do painel; sem isso, baixa.
+  if (req.query.inline === '1') {
+    res.type(req.params.kind === 'xml' ? 'application/xml' : 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${path.basename(resolved)}"`);
+    return res.sendFile(resolved);
+  }
   res.download(resolved);
 });
 

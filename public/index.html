@@ -49,16 +49,17 @@
             <div class="safety-box" id="safetyBox"></div>
           </div>
           <div class="card">
-            <div class="card-head"><div><h2>Ações</h2><p>Processamento manual das pendências do mês.</p></div></div>
+            <div class="card-head"><div><h2>Pendências</h2><p>O que o worker processa no próximo ciclo.</p></div><span class="badge neutral" id="pendingCount">—</span></div>
+            <div id="pendingList" class="pending-list"></div>
             <div class="action-stack">
               <button class="btn primary" id="runDueBtn">Processar pendências agora</button>
-              <span class="hint">Só emite se “Permitir emissão real” estiver ligado nas configurações.</span>
+              <span class="hint">Só emite se “Permitir emissão real” estiver ligado no Agendamento.</span>
             </div>
           </div>
         </div>
         <div class="card">
           <div class="card-head"><div><h2>Últimas notas</h2><p>Status recente do processamento.</p></div></div>
-          <div class="table-wrap"><table><thead><tr><th>Competência</th><th>Cliente</th><th>Valor</th><th>Status</th><th>NFS-e</th></tr></thead><tbody id="recentInvoices"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Competência</th><th>Cliente</th><th>Valor</th><th>Status</th><th>DANFSe</th></tr></thead><tbody id="recentInvoices"></tbody></table></div>
         </div>
       </section>
 
@@ -324,11 +325,23 @@
       <section id="tab-history" class="tab">
         <div class="card">
           <div class="card-head"><div><h2>Histórico</h2><p>Nunca reemitimos automaticamente depois do clique final no portal.</p></div><div class="actions"><button class="btn secondary" type="button" id="registerInvoiceBtn">Registrar nota já emitida</button><button class="btn secondary" type="button" id="refreshHistoryBtn">Atualizar</button></div></div>
-          <div class="table-wrap"><table><thead><tr><th>Data prevista</th><th>Competência</th><th>Cliente</th><th>Valor</th><th>Status</th><th>NFS-e</th><th>Arquivos</th><th></th></tr></thead><tbody id="historyTable"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Data prevista</th><th>Competência</th><th>Cliente</th><th>Valor</th><th>Status</th><th>DANFSe</th><th></th></tr></thead><tbody id="historyTable"></tbody></table></div>
         </div>
       </section>
     </main>
   </div>
+
+  <dialog id="pdfDialog" class="pdf-dialog">
+    <div class="image-head">
+      <strong id="pdfTitle">DANFSe</strong>
+      <div class="image-tools">
+        <a class="btn secondary small" id="pdfDownload" download>Baixar</a>
+        <a class="btn secondary small" id="pdfOpen" target="_blank" rel="noopener">Abrir em nova aba</a>
+        <button class="icon-btn" type="button" data-close aria-label="Fechar">×</button>
+      </div>
+    </div>
+    <iframe id="pdfFrame" title="DANFSe"></iframe>
+  </dialog>
 
   <dialog id="registerDialog">
     <form id="registerForm" class="dialog-form">

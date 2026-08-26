@@ -45,6 +45,33 @@ function ensureInvoiceForAutomation(automation, ctx, { ignoreDue = false } = {})
   });
 }
 
+// Mesma regra do worker, só que sem criar nada: é o que a Visão geral mostra
+// como "vai ser processado no próximo ciclo".
+function listPending() {
+  const ctx = todayContext();
+  const pendentes = [];
+  for (const automation of listAutomations()) {
+    if (!automation.enabled || !automation.client_active) continue;
+    const due = dueInfo(automation, ctx);
+    const invoice = getInvoiceByAutomationCompetence(automation.id, due.competence);
+    const status = invoice ? invoice.status : 'PENDING';
+    if (invoice && !['PENDING', 'ERROR_BEFORE_SUBMIT'].includes(status)) continue;
+    pendentes.push({
+      automationId: automation.id,
+      automationName: automation.name,
+      clientName: automation.client_name,
+      competence: due.competence,
+      scheduledDate: due.scheduledDate,
+      startDate: due.startDate,
+      valueCents: automation.value_cents,
+      due: due.due,
+      status,
+      invoiceId: invoice?.id || null
+    });
+  }
+  return pendentes;
+}
+
 async function processInvoice(invoiceId, { allowEmission = false } = {}) {
   let invoice = getInvoice(invoiceId);
   if (!invoice) throw new Error('Nota agendada não encontrada.');
@@ -218,6 +245,7 @@ async function processDueAutomations({ manual = false, limit = Infinity } = {}) 
 module.exports = {
   todayContext,
   dueInfo,
+  listPending,
   ensureInvoiceForAutomation,
   processInvoice,
   previewAutomation,

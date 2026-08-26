@@ -210,7 +210,7 @@ function renderPersistWarning() {
 
 function renderRecent() {
   const rows = state.invoices.slice(0, 8);
-  $('#recentInvoices').innerHTML = rows.length ? rows.map((i) => `<tr><td>${esc(i.competence)}</td><td>${esc(i.client_name)}</td><td>${money(i.value_cents)}</td><td>${badgeStatus(i.status)}</td><td>${esc(i.nfse_number || '—')}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">Nenhuma nota processada.</td></tr>';
+  $('#recentInvoices').innerHTML = rows.length ? rows.map((i) => `<tr><td>${esc(i.competence)}</td><td>${esc(i.client_name)}</td><td>${money(i.value_cents)}</td><td>${badgeStatus(i.status)}</td><td>${botaoDanfse(i)}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">Nenhuma nota processada.</td></tr>';
 }
 
 function automationsOf(clientId) {
@@ -267,21 +267,55 @@ function renderAutomations() {
   }).join('');
 }
 
+// O número da NFS-e sai das tabelas: o que interessa no dia a dia é o
+// documento, que abre aqui mesmo. O número segue nos Detalhes e no DANFSe.
+function botaoDanfse(i) {
+  if (!i.pdf_path) return '<span class="hint">—</span>';
+  return `<button class="btn secondary small" onclick="abrirDanfse(${i.id}, '${esc(i.competence)}', '${esc(i.client_name)}')">Ver DANFSe</button>`;
+}
+
+window.abrirDanfse = function(id, competencia, cliente) {
+  const url = `/api/invoices/${id}/file/pdf`;
+  $('#pdfTitle').textContent = `DANFSe · ${cliente} · ${competencia}`;
+  $('#pdfDownload').href = url;
+  $('#pdfOpen').href = url;
+  $('#pdfFrame').src = `${url}?inline=1#view=FitH&navpanes=0`;
+  $('#pdfDialog').showModal();
+};
+
 function renderHistory() {
   $('#historyTable').innerHTML = state.invoices.length ? state.invoices.map((i) => `<tr>
-    <td>${esc(i.scheduled_date)}</td><td>${esc(i.competence)}</td><td>${esc(i.client_name)}</td><td>${money(i.value_cents)}</td><td>${badgeStatus(i.status)}</td><td>${esc(i.nfse_number || '—')}</td>
-    <td><div class="file-links">${i.pdf_path ? `<a class="btn secondary small" href="/api/invoices/${i.id}/file/pdf">PDF</a>` : ''}${i.xml_path ? `<a class="btn secondary small" href="/api/invoices/${i.id}/file/xml">XML</a>` : ''}${!i.pdf_path && !i.xml_path ? '—' : ''}</div></td>
+    <td>${esc(i.scheduled_date)}</td><td>${esc(i.competence)}</td><td>${esc(i.client_name)}</td><td>${money(i.value_cents)}</td><td>${badgeStatus(i.status)}</td>
+    <td><div class="file-links">${botaoDanfse(i)}${i.xml_path ? `<a class="btn secondary small" href="/api/invoices/${i.id}/file/xml">XML</a>` : ''}</div></td>
     <td><div class="actions"><button class="btn secondary small" onclick="showInvoice(${i.id})">Detalhes</button>${i.access_key ? `<a class="btn secondary small" href="https://www.nfse.gov.br/EmissorNacional/Notas/Visualizar/Index/${esc(i.access_key)}" target="_blank" rel="noopener" title="Abrir a nota no Emissor Nacional (para baixar XML/DANFSe oficiais)">Portal</a>` : ''}${i.status === 'DOCUMENT_ERROR' && i.access_key ? `<button class="btn secondary small" onclick="retryDocumentsAction(${i.id},this)">Documentos</button>` : ''}${['ISSUED','EMAIL_ERROR','DOCUMENT_ERROR'].includes(i.status) ? `<button class="btn secondary small" onclick="retryEmailAction(${i.id},this)">E-mail</button>` : ''}${i.status === 'ERROR_BEFORE_SUBMIT' ? `<button class="btn danger small" onclick="retryEmission(${i.id},this)">Tentar emissão</button>` : ''}</div></td>
-  </tr>`).join('') : '<tr><td colspan="8" class="empty">Sem histórico.</td></tr>';
+  </tr>`).join('') : '<tr><td colspan="7" class="empty">Sem histórico.</td></tr>';
+}
+
+function renderPending() {
+  const itens = state.pending || [];
+  const vencidas = itens.filter((p) => p.due);
+  $('#pendingCount').textContent = vencidas.length ? `${vencidas.length} para processar` : 'nada vencido';
+  $('#pendingCount').className = `badge ${vencidas.length ? 'warn' : 'ok'}`;
+  if (!itens.length) {
+    $('#pendingList').innerHTML = '<div class="empty">Nenhuma automação ativa aguardando processamento.</div>';
+    return;
+  }
+  $('#pendingList').innerHTML = itens.map((p) => `<div class="pending-row${p.due ? '' : ' aguardando'}">
+    <div>
+      <strong>${esc(p.clientName)}</strong> · ${esc(p.automationName)}
+      <div class="pending-meta">competência ${esc(p.competence)} · previsto para ${esc(p.scheduledDate.split('-').reverse().join('/'))} · ${money(p.valueCents)}${p.status === 'ERROR_BEFORE_SUBMIT' ? ' · <span class="danger-text">falhou antes de emitir</span>' : ''}</div>
+    </div>
+    ${p.due ? '<span class="badge warn">vencida</span>' : `<span class="badge neutral">a partir de ${esc((p.startDate || p.scheduledDate).split('-').reverse().join('/'))}</span>`}
+  </div>`).join('');
 }
 
 async function refreshAll() {
-  const [status, clients, automations, invoices, sessionInfo] = await Promise.all([
-    api('/api/status'), api('/api/clients?all=1'), api('/api/automations'), api('/api/invoices'), api('/api/session')
+  const [status, clients, automations, invoices, sessionInfo, pending] = await Promise.all([
+    api('/api/status'), api('/api/clients?all=1'), api('/api/automations'), api('/api/invoices'), api('/api/session'), api('/api/pending')
   ]);
-  state.status = status; state.settings = status.settings; state.clients = clients; state.automations = automations; state.invoices = invoices;
+  state.status = status; state.settings = status.settings; state.clients = clients; state.automations = automations; state.invoices = invoices; state.pending = pending;
   $('#logoutBtn').hidden = !sessionInfo.authRequired;
-  fillAllForms(); renderPersistWarning(); renderStats(); renderClients(); renderAutomations(); renderHistory(); renderRecent();
+  fillAllForms(); renderPersistWarning(); renderStats(); renderPending(); renderClients(); renderAutomations(); renderHistory(); renderRecent();
 }
 
 window.editClient = function(id) {

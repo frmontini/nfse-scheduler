@@ -43,7 +43,8 @@ Também foram usados como referência de arquitetura/comportamento:
   - envio de e-mail ligado/desligado;
   - algumas sobrescritas tributárias.
 - SQLite criado automaticamente em `./data/nfse.sqlite`.
-- Histórico e eventos de cada tentativa.
+- Visão geral com a fila de pendências: o que o worker vai processar no próximo ciclo, e o que ainda não venceu.
+- Histórico e eventos de cada tentativa, com o DANFSe abrindo no próprio painel.
 - Proteção de duplicidade por `automação + competência`.
 - Envio de e-mail por SMTP **ou** pela API HTTP do Brevo, escolhido pela flag `MAIL_PROVIDER` no `.env`.
 - Retry de e-mail separado da emissão.
@@ -233,6 +234,8 @@ Isso é o que a **NT 008/2026** determina desde 01/07/2026: a API oficial de DAN
 O **XML** continua só no portal: o histórico tem um botão **Portal**, que abre a nota para você baixá-lo à mão quando precisar. Isso é registrado como observação da nota, não como erro — não há o que corrigir no sistema.
 
 O layout fica em `src/danfse.js` e a leitura da visualização em `src/danfse-parse.js`.
+
+Nas tabelas não existe coluna com o número da NFS-e: o que interessa no dia a dia é o documento, que abre em um visualizador dentro do painel (com botões de baixar e abrir em nova aba). O número continua nos *Detalhes* da nota e impresso no próprio DANFSe.
 
 ## Acesso ao painel
 
