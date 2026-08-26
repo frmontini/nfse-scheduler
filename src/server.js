@@ -13,6 +13,7 @@ const express = require('express');
 const {
   DATA_DIR,
   DB_PATH,
+  dataIsPersistent,
   getSettings,
   saveSettings,
   listClients,
@@ -27,6 +28,7 @@ const {
   setAutomationEnabled,
   listInvoices,
   getInvoice,
+  registerIssuedInvoice,
   listInvoiceEvents,
   getDashboardCounts
 } = require('./db');
@@ -145,6 +147,7 @@ app.get('/api/status', (req, res) => {
     mail: { provider: mailProvider(), label: providerLabel(), configured: mailConfigured(), from: mailFrom() },
     authRequired: session.authRequired(),
     timezone: defaultTimezone(),
+    dataPersistent: dataIsPersistent(),
     workerIntervalMinutes: intervalMinutes(),
     settings: getSettings()
   });
@@ -210,6 +213,13 @@ app.post('/api/invoices/:id/retry', asyncRoute(async (req, res) => {
   if (req.body?.confirmation !== 'EMITIR') return res.status(400).json({ error: 'Confirmação inválida.' });
   res.json(await processInvoice(invoice.id, { allowEmission: true }));
 }));
+app.post('/api/invoices/registrar', (req, res, next) => {
+  try {
+    const { automationId, competence, nfseNumber, accessKey, issuedAt } = req.body || {};
+    if (!automationId || !competence) return res.status(400).json({ error: 'Informe a automação e a competência (AAAA-MM).' });
+    res.status(201).json(registerIssuedInvoice({ automationId, competence, nfseNumber, accessKey, issuedAt }));
+  } catch (err) { next(err); }
+});
 app.post('/api/invoices/:id/retry-documents', asyncRoute(async (req, res) => res.json(await retryDocuments(req.params.id))));
 app.post('/api/invoices/:id/retry-email', asyncRoute(async (req, res) => res.json(await retryEmail(req.params.id))));
 

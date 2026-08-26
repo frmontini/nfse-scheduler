@@ -39,6 +39,7 @@
       </header>
 
       <div id="toast" class="toast hidden"></div>
+      <div id="persistWarning" class="notice danger" hidden></div>
 
       <section id="tab-dashboard" class="tab active">
         <div class="stats" id="stats"></div>
@@ -322,12 +323,32 @@
 
       <section id="tab-history" class="tab">
         <div class="card">
-          <div class="card-head"><div><h2>Histórico</h2><p>Nunca reemitimos automaticamente depois do clique final no portal.</p></div><button class="btn secondary" type="button" id="refreshHistoryBtn">Atualizar</button></div>
+          <div class="card-head"><div><h2>Histórico</h2><p>Nunca reemitimos automaticamente depois do clique final no portal.</p></div><div class="actions"><button class="btn secondary" type="button" id="registerInvoiceBtn">Registrar nota já emitida</button><button class="btn secondary" type="button" id="refreshHistoryBtn">Atualizar</button></div></div>
           <div class="table-wrap"><table><thead><tr><th>Data prevista</th><th>Competência</th><th>Cliente</th><th>Valor</th><th>Status</th><th>NFS-e</th><th>Arquivos</th><th></th></tr></thead><tbody id="historyTable"></tbody></table></div>
         </div>
       </section>
     </main>
   </div>
+
+  <dialog id="registerDialog">
+    <form id="registerForm" class="dialog-form">
+      <div class="dialog-head">
+        <div><h2>Registrar nota já emitida</h2><p>Para notas que saíram no portal mas não estão neste histórico.</p></div>
+        <button class="icon-btn" type="button" data-close aria-label="Fechar">×</button>
+      </div>
+      <div class="notice info">Registrar aqui devolve a proteção contra duplicidade: o worker passa a saber que essa competência já tem nota e não emite outra.</div>
+      <div class="form-grid cols-2">
+        <label class="span-2">Automação<select name="automationId" required></select></label>
+        <label>Competência<input name="competence" placeholder="2026-08" pattern="\d{4}-\d{2}" required></label>
+        <label>Número da NFS-e<input name="nfseNumber" placeholder="93"></label>
+        <label class="span-2">Chave de acesso<input name="accessKey" placeholder="50 dígitos, opcional"></label>
+      </div>
+      <div class="dialog-actions">
+        <button class="btn secondary" type="button" data-close>Cancelar</button>
+        <button class="btn primary" type="submit">Registrar</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="confirmDialog" class="confirm-dialog">
     <div class="dialog-form">

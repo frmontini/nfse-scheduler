@@ -7,6 +7,21 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(path.join(DATA_DIR, 'files'), { recursive: true });
 fs.mkdirSync(path.join(DATA_DIR, 'debug'), { recursive: true });
 
+// Sem volume montado, o banco vive dentro do container e some no próximo
+// deploy. Detectar isso é a diferença entre perder o histórico e ser avisado.
+function dataIsPersistent() {
+  try {
+    const alvo = path.resolve(DATA_DIR);
+    const mounts = fs.readFileSync('/proc/mounts', 'utf8')
+      .split('\n')
+      .map((linha) => linha.split(' ')[1])
+      .filter(Boolean);
+    return mounts.some((m) => m === alvo || alvo.startsWith(`${m}/`) && m !== '/');
+  } catch {
+    return null; // fora de Linux/container não dá para saber
+  }
+}
+
 const DB_PATH = path.join(DATA_DIR, 'nfse.sqlite');
 const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA journal_mode=WAL;');
@@ -438,6 +453,31 @@ function getInvoiceByAutomationCompetence(automationId, competence) {
     .get(Number(automationId), competence);
 }
 
+// Nota emitida fora do painel (ou perdida num redeploy sem volume) precisa
+// existir aqui, senão a trava automação+competência deixa passar uma segunda.
+function registerIssuedInvoice({ automationId, competence, nfseNumber, accessKey, issuedAt }) {
+  const automation = getAutomation(automationId);
+  if (!automation) throw new Error('Automação não encontrada.');
+  const existente = getInvoiceByAutomationCompetence(automationId, competence);
+  if (existente) throw new Error(`Já existe nota registrada para essa automação em ${competence}.`);
+  const ts = nowIso();
+  const quando = issuedAt || ts;
+  const result = db.prepare(`
+    INSERT INTO invoices(
+      automation_id, client_id, competence, scheduled_date, status, value_cents,
+      discount_incond_cents, discount_cond_cents, nfse_number, access_key,
+      submitted_at, issued_at, created_at, updated_at
+    ) VALUES(?, ?, ?, ?, 'ISSUED', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    Number(automationId), Number(automation.client_id), competence, quando.slice(0, 10),
+    Number(automation.value_cents), Number(automation.discount_incond_cents || 0), Number(automation.discount_cond_cents || 0),
+    String(nfseNumber || '') || null, String(accessKey || '') || null, quando, quando, ts, ts
+  );
+  const id = Number(result.lastInsertRowid);
+  addInvoiceEvent(id, 'REGISTERED', 'Nota emitida no portal registrada manualmente; a partir daqui a competência está protegida contra duplicidade.');
+  return getInvoice(id);
+}
+
 function createInvoice({ automationId, clientId, competence, scheduledDate, valueCents, discountIncondCents, discountCondCents }) {
   const ts = nowIso();
   try {
@@ -520,6 +560,7 @@ module.exports = {
   db,
   DB_PATH,
   DATA_DIR,
+  dataIsPersistent,
   DEFAULT_SETTINGS,
   getSettings,
   saveSettings,
@@ -537,6 +578,7 @@ module.exports = {
   getInvoice,
   getInvoiceByAutomationCompetence,
   createInvoice,
+  registerIssuedInvoice,
   updateInvoice,
   addInvoiceEvent,
   listInvoiceEvents,

@@ -73,7 +73,7 @@ const statusLabels = {
   SUBMITTING: ['Enviando', 'warn'], REVIEW_REQUIRED: ['Conferir no portal', 'error'], ISSUED: ['Emitida', 'ok'],
   DOCUMENT_ERROR: ['Documento pendente', 'warn'], EMAIL_ERROR: ['E-mail pendente', 'warn'], SENT: ['Enviada', 'ok']
 };
-const eventLabels = { NOTIFY_SENT: 'AVISO ENVIADO', NOTIFY_ERROR: 'AVISO FALHOU' };
+const eventLabels = { NOTIFY_SENT: 'AVISO ENVIADO', NOTIFY_ERROR: 'AVISO FALHOU', REGISTERED: 'NOTA REGISTRADA' };
 function badgeStatus(status) { const [label, kind] = statusLabels[status] || [status, 'neutral']; return `<span class="badge ${kind}">${esc(label)}</span>`; }
 
 function setByPath(obj, path, value) {
@@ -198,6 +198,16 @@ function renderStats() {
     <div class="safety-row"><span>Aviso de envio</span>${em.notifyOnSent ? `<span class="badge ok">${esc(notifyModes[em.notifyMode] || 'Aviso separado')} → ${esc(notifyTarget)}</span>` : '<span class="badge neutral">Desligado</span>'}</div>`;
 }
 
+// Sem volume montado, o banco vive dentro do container e some no redeploy.
+function renderPersistWarning() {
+  const box = $('#persistWarning');
+  const ok = state.status?.dataPersistent;
+  box.hidden = ok !== false;
+  if (ok === false) {
+    box.innerHTML = `<strong>Os dados não estão em volume.</strong> O banco está dentro do container, em <code>${esc(state.status.dataDir)}</code>, e será perdido no próximo deploy — junto com o histórico e a proteção contra nota duplicada. Monte um volume nesse caminho no Dokploy (Mounts) antes de emitir.`;
+  }
+}
+
 function renderRecent() {
   const rows = state.invoices.slice(0, 8);
   $('#recentInvoices').innerHTML = rows.length ? rows.map((i) => `<tr><td>${esc(i.competence)}</td><td>${esc(i.client_name)}</td><td>${money(i.value_cents)}</td><td>${badgeStatus(i.status)}</td><td>${esc(i.nfse_number || '—')}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">Nenhuma nota processada.</td></tr>';
@@ -271,7 +281,7 @@ async function refreshAll() {
   ]);
   state.status = status; state.settings = status.settings; state.clients = clients; state.automations = automations; state.invoices = invoices;
   $('#logoutBtn').hidden = !sessionInfo.authRequired;
-  fillAllForms(); renderStats(); renderClients(); renderAutomations(); renderHistory(); renderRecent();
+  fillAllForms(); renderPersistWarning(); renderStats(); renderClients(); renderAutomations(); renderHistory(); renderRecent();
 }
 
 window.editClient = function(id) {
@@ -488,6 +498,19 @@ $('#openSchedulerBtn').addEventListener('click',()=>{fillForm($('#schedulerForm'
 $('#newClientBtn').addEventListener('click',openNewClient);
 $('#newAutomationBtn').addEventListener('click',openNewAutomation);
 $('#refreshHistoryBtn').addEventListener('click',()=>refreshAll().catch(e=>toast(e.message,true)));
+$('#registerInvoiceBtn').addEventListener('click',()=>{
+  const f=$('#registerForm');f.reset();
+  f.automationId.innerHTML=state.automations.map((a)=>`<option value="${a.id}">${esc(a.name)} · ${esc(a.client_name)}</option>`).join('');
+  const hoje=new Date();f.competence.value=`${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}`;
+  $('#registerDialog').showModal();
+});
+$('#registerForm').addEventListener('submit',async(e)=>{
+  e.preventDefault();const f=e.currentTarget;
+  try{
+    await api('/api/invoices/registrar',{method:'POST',body:JSON.stringify({automationId:Number(f.automationId.value),competence:f.competence.value.trim(),nfseNumber:f.nfseNumber.value.trim(),accessKey:f.accessKey.value.trim()})});
+    $('#registerDialog').close();toast('Nota registrada. Essa competência está protegida contra duplicidade.');await refreshAll();
+  }catch(err){toast(err.message,true)}
+});
 
 $('#clientForm').addEventListener('submit',async(e)=>{e.preventDefault();const f=e.currentTarget;const payload={name:f.name.value,type:f.type.value,document:f.document.value,email:f.email.value,active:f.active.checked};try{if(f.id.value)await api(`/api/clients/${f.id.value}`,{method:'PUT',body:JSON.stringify(payload)});else await api('/api/clients',{method:'POST',body:JSON.stringify(payload)});$('#clientDialog').close();toast('Cliente salvo.');await refreshAll();}catch(err){toast(err.message,true)}});
 
