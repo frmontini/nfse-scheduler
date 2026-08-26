@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Entrar · NFS-e Auto</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="login-body">
+  <main class="login-card">
+    <div class="login-brand">
+      <div class="brand-mark">N</div>
+      <div><strong>NFS-e Auto</strong><span>Emissor Nacional</span></div>
+    </div>
+    <h1>Entrar no painel</h1>
+    <p class="login-sub">Use as credenciais definidas em <code>APP_ADMIN_USER</code> e <code>APP_ADMIN_PASSWORD</code>.</p>
+    <form id="loginForm" autocomplete="on">
+      <label>Usuário<input name="user" autocomplete="username" required autofocus></label>
+      <label>Senha<input name="password" type="password" autocomplete="current-password" required></label>
+      <div id="loginError" class="login-error" hidden></div>
+      <button class="btn primary login-submit" type="submit">Entrar</button>
+    </form>
+  </main>
+  <script>
+    const form = document.getElementById('loginForm');
+    const errorBox = document.getElementById('loginError');
+    const nextUrl = new URLSearchParams(location.search).get('next') || '/';
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = form.querySelector('button');
+      button.disabled = true;
+      errorBox.hidden = true;
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user: form.user.value, password: form.password.value })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        location.href = nextUrl.startsWith('/') ? nextUrl : '/';
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.hidden = false;
+        form.password.value = '';
+        form.password.focus();
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

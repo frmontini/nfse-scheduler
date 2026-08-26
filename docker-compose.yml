@@ -1,0 +1,13 @@
+services:
+  nfse-auto:
+    build: .
+    container_name: nfse-auto
+    restart: unless-stopped
+    init: true          # PID 1 que recolhe os processos do Chromium
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+    shm_size: "1gb"

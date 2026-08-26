@@ -1,0 +1,46 @@
+# Compose para o Dokploy (tipo "Docker Compose").
+# Diferenças para o compose local:
+#   - nenhuma porta publicada: quem entrega o painel é o Traefik do Dokploy,
+#     pelo domínio que você cadastrar apontando para a porta 3000;
+#   - volume nomeado em vez de bind mount, para o banco/PDFs sobreviverem a redeploy;
+#   - healthcheck, para o deploy só virar quando o painel realmente responder.
+# As variáveis abaixo vêm da aba Environment do Dokploy.
+services:
+  nfse-auto:
+    build:
+      context: .
+    restart: unless-stopped
+    init: true          # PID 1 que recolhe os processos do Chromium
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATA_DIR: /data
+      TZ: ${TZ:-America/Sao_Paulo}
+      APP_ADMIN_USER: ${APP_ADMIN_USER:-admin}
+      APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD}
+      NFSE_LOGIN: ${NFSE_LOGIN}
+      NFSE_PASSWORD: ${NFSE_PASSWORD}
+      NFSE_BASE_URL: ${NFSE_BASE_URL:-https://www.nfse.gov.br}
+      PLAYWRIGHT_HEADLESS: "true"
+      MAIL_PROVIDER: ${MAIL_PROVIDER:-brevo}
+      MAIL_FROM: ${MAIL_FROM}
+      BREVO_API_KEY: ${BREVO_API_KEY}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+    expose:
+      - "3000"
+    volumes:
+      - nfse-data:/data
+    shm_size: "1gb"
+    networks:
+      - dokploy-network
+
+volumes:
+  nfse-data:
+
+networks:
+  dokploy-network:
+    external: true

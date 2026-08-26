@@ -1,0 +1,22 @@
+{
+  "name": "nfse-auto-panel",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Automação recorrente de NFS-e Nacional com painel web, SQLite, Playwright e SMTP",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node --experimental-sqlite src/server.js",
+    "dev": "node --experimental-sqlite --watch src/server.js",
+    "test": "node --experimental-sqlite --test test/*.test.js",
+    "check": "node --check src/server.js && node --check src/service.js && node --check src/email.js && node --check src/mailer.js && node --check src/session.js && node --check src/xml-import.js && node --check src/emitter/national.js"
+  },
+  "dependencies": {
+    "express": "4.21.2",
+    "node-cron": "4.2.1",
+    "nodemailer": "6.10.1",
+    "playwright": "1.61.1"
+  }
+}
