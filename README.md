@@ -182,6 +182,12 @@ A *competência* que continua no banco é outra coisa: o **mês de referência**
 
 Não há mais escolha de *mês atual / mês anterior*: como a data enviada ao portal é sempre a da emissão, o mês de referência acompanha. A coluna `competence_mode` continua no schema por compatibilidade com bancos antigos, mas não é lida.
 
+## Nota emitida que não está no histórico
+
+Se uma nota saiu no portal mas não consta aqui — banco recriado sem volume, emissão feita à mão, migração de outro sistema —, use **Registrar nota já emitida**, no Histórico. Informe a automação, a competência e, se quiser, número e chave.
+
+Isso não emite nada: grava a nota como `ISSUED` naquela competência. É o que devolve a proteção contra duplicidade — sem o registro, o worker enxerga a competência em aberto e emite uma segunda nota no ciclo seguinte.
+
 ## Segurança contra nota duplicada
 
 Existem duas camadas:
@@ -219,113 +225,6 @@ Isso é o que a **NT 008/2026** determina desde 01/07/2026: a API oficial de DAN
 O **XML** continua só no portal: o histórico tem um botão **Portal**, que abre a nota para você baixá-lo à mão quando precisar. Isso é registrado como observação da nota, não como erro — não há o que corrigir no sistema.
 
 O layout fica em `src/danfse.js` e a leitura da visualização em `src/danfse-parse.js`.
-
-## Município e Código de Tributação: por que existem dois campos
-
-As duas listas dessa etapa no portal são widgets **Select2 com busca no servidor**: a lista não vem pronta, é preciso digitar um termo, esperar o AJAX responder e então clicar na opção certa. Daí o par de campos, herdado do `Sutil/Emissor-NFS-e-bot`: um termo alimenta a busca, o outro identifica a opção no resultado.
-
-Nesta versão o **termo de busca é opcional**: quando fica vazio, ele é deduzido do nome exato — município sem a UF (`Neves Paulista/SP` → `Neves Paulista`) e código de tributação pelo número (`01.01.01 - Análise...` → `01.01.01`), que é como o portal indexa cada lista. O painel mostra só o nome; o termo fica em *Ajuste fino da busca*, para o caso raro de a dedução não achar a opção.
-
-A emissão agora exige apenas **município**, **código de tributação** e **descrição** preenchidos.
-
-## CNAE e NBS
-
-CNAE e NBS ficam persistidos como **dados cadastrais/referência**. No fluxo Web atual da Emissão Completa, o campo operacional que a automação seleciona é o **Código de Tributação Nacional do serviço**. O projeto não injeta CNAE/NBS em campos inexistentes só para “preencher tudo”.
-
-Existe um campo `ServicoPrestado_CodigoNBS` no portal, mas ele aparece no fluxo de **exportação/serviço internacional**, que este projeto não automatiza — conferido contra `Sutil/Emissor-NFS-e-bot`, que só o usa em `EmitirInternacional`.
-
-## Valor aproximado dos tributos
-
-O portal oferece quatro opções nesse bloco, e o painel usa exatamente as mesmas:
-
-| Opção | `ValorTributos.TipoValorTributos` | Campo preenchido |
-| --- | --- | --- |
-| Informar alíquota do Simples Nacional | 4 | `ValorTributos.AliquotaSN` |
-| Configurar valores percentuais | 2 | `PercentualTotalFederal/Estadual/Municipal` |
-| Preencher valores monetários | 1 | `ValorTotalFederal/Estadual/Municipal` |
-| Não informar (Decreto 8.264/2014) | 3 | — |
-
-Para optante do Simples o portal **já marca a opção 4** e mostra o campo de alíquota; é o padrão do projeto, alimentado pelo `pTotTribSN` do XML.
-
-## Simples Nacional
-
-Para optante, o portal exige na etapa Pessoas o **Regime de Apuração dos Tributos no Simples Nacional** (`SimplesNacional.RegimeApuracaoTributosSN`), um campo obrigatório que não existia nas versões anteriores do fluxo:
-
-| Valor | Significado |
-| --- | --- |
-| 1 | Tributos federais e municipal pelo Simples Nacional |
-| 2 | Federais pelo Simples Nacional e ISSQN pela NFS-e, conforme a legislação municipal |
-| 3 | Federais e municipal pela NFS-e, conforme a legislação de cada tributo |
-
-Ele fica em *Empresa e tributos → Tributos* e vem preenchido pelo `regApTribSN` do XML importado. É um `<select>` escondido atrás de um widget Chosen: a automação tenta abrir o widget e clicar na opção e, se o widget não responder, escreve o valor no select nativo disparando `change`. Como o campo é obrigatório, falhar nele **para antes do Avançar**, com mensagem própria, em vez de esbarrar no "Campo obrigatório" genérico do portal.
-
-Quando o portal deixa campos de tributação federal bloqueados/`readonly`, o sistema **não força alteração**. Ele tenta preencher apenas campos editáveis. Isso evita sobrescrever valores que o próprio Emissor calcula/preenche para o regime tributário do prestador.
-
-## Desconto incondicional
-
-Há campo específico por automação. Na etapa Valores, a automação procura o campo do portal usando os IDs conhecidos e um fallback pelo rótulo “Desconto incondicional”. Se o portal mudar e o campo não puder ser localizado, a emissão para **antes do clique final** com `ERROR_BEFORE_SUBMIT`.
-
-## Várias notas para o mesmo cliente
-
-O cliente é cadastrado **uma vez** (CPF/CNPJ é único, porque é a mesma empresa). Quem gera nota é a **automação**, e um cliente pode ter quantas automações você quiser:
-
-```text
-ACME COMERCIO LTDA (cadastrado uma vez)
-├── ACME - mensalidade do contrato        R$ 3.500,00   sem desconto
-└── ACME - consultoria avulsa             R$ 1.200,00   desc. incondicional R$ 200 + condicionado R$ 100
-```
-
-Na competência 2026-08 isso vira **duas NFS-e separadas**, cada uma com seus valores, descontos, descrição, município e código de tributação. Valor, desconto incondicional e desconto condicionado são campos **de cada automação** — e a aba *Tributos avançados* de cada uma ainda sobrescreve ISS/PIS/COFINS/IRRF/CSLL quando aquela nota específica precisa.
-
-A trava de duplicidade é por `automação + competência`, e não por cliente: duas automações do mesmo cliente **não** brigam entre si, mas a mesma automação nunca emite duas vezes no mesmo mês.
-
-No painel:
-
-- a lista de **Automações** vem agrupada por cliente, mostrando quantas notas por competência e o total mensal;
-- **+ Outra nota para este cliente** (no grupo ou na aba *Clientes*) abre o cadastro já com o cliente escolhido;
-- **Duplicar** copia uma automação existente para você só trocar o desconto/valor e salvar.
-
-## Data de Competência
-
-O campo **Data de Competência** do portal recebe sempre a **data da geração da nota**, no timezone configurado — igual ao que o portal preenche quando você emite à mão, e igual ao `Sutil/Emissor-NFS-e-bot`. Não existe data de competência guardada nem derivada.
-
-A *competência* que continua no banco é outra coisa: o **mês de referência** (`2026-08`), sempre o mês corrente. Ela não vai para esse campo; serve para
-
-- os placeholders `{MES}`/`{MES_NUM}`/`{ANO}` da descrição do serviço e do e-mail;
-- a trava `automação + competência`, que impede duas notas da mesma automação no mesmo mês;
-- a organização de `data/files` e do histórico.
-
-Não há mais escolha de *mês atual / mês anterior*: como a data enviada ao portal é sempre a da emissão, o mês de referência acompanha. A coluna `competence_mode` continua no schema por compatibilidade com bancos antigos, mas não é lida.
-
-## Segurança contra nota duplicada
-
-Existem duas camadas:
-
-1. SQLite impede mais de um registro para a mesma `automação + competência`.
-2. Imediatamente antes de clicar em **Emitir NFS-e**, o registro recebe `submitted_at` e status `SUBMITTING`.
-
-Depois dessa fronteira, qualquer timeout, mudança de HTML ou resposta incerta vira `REVIEW_REQUIRED`. O worker **não tenta emitir de novo automaticamente**. Primeiro confira no portal.
-
-Principais status:
-
-- `PENDING`: registrada, ainda não enviada;
-- `ERROR_BEFORE_SUBMIT`: falhou antes do clique final; pode ser repetida com segurança após correção;
-- `SUBMITTING`: fronteira do clique final;
-- `REVIEW_REQUIRED`: resultado incerto; conferir manualmente;
-- `ISSUED`: emissão confirmada por chave capturada;
-- `DOCUMENT_ERROR`: nota emitida, mas PDF/XML ainda não recuperados;
-- `EMAIL_ERROR`: nota emitida, falha apenas no SMTP;
-- `SENT`: e-mail enviado.
-
-## PDF/DANFSe e CAPTCHA
-
-O projeto **não resolve, burla nem tenta contornar CAPTCHA**.
-
-Depois da emissão ele usa a mesma sessão autenticada para abrir a visualização da NFS-e pela chave. Quando o portal fornece a rota de impressão, o Chromium gera um PDF dessa visualização. Se a página exigir CAPTCHA ou a rota mudar, a nota fica em `DOCUMENT_ERROR`; ela **não é reemitida**. O painel permite tentar recuperar os documentos novamente.
-
-O XML é baixado somente se um link autenticado válido for encontrado e o conteúdo retornado for realmente XML.
-
-Existem rotas diretas no ADN (`https://adn.nfse.gov.br/xml/{chave}` e `/danfse/{chave}`), mas elas exigem certificado A1/mTLS — no `cleitonleonel/emissor_nfse` só são usadas quando há `.pfx` configurado. Sem A1 sobra o portal, e a NT 008/2026 descontinuou a API oficial de DANFSe em 01/07/2026: quem emite passa a gerar o documento localmente. É o que este projeto faz, imprimindo a visualização autenticada pelo Chromium.
 
 ## Acesso ao painel
 
@@ -401,7 +300,7 @@ Passo a passo:
 1. **Create Service → Application**, apontando para o repositório e a branch `main`.
 2. **Build Type: Dockerfile** (o da raiz).
 3. **Environment**: cole o conteúdo do `.env.example` já preenchido. `APP_ADMIN_PASSWORD` é obrigatório: com `NODE_ENV=production` e sem senha, o processo encerra na subida em vez de abrir o painel na internet. Use `ALLOW_NO_AUTH=1` só se houver outra proteção na frente.
-4. **Mounts / Volumes**: monte um volume em **`/data`**. É onde ficam `nfse.sqlite`, PDFs/XML e screenshots — sem ele, cada redeploy começa do zero e a proteção de duplicidade por `automação + competência` perde a memória.
+4. **Mounts / Volumes**: monte um volume em **`/data`**. É onde ficam `nfse.sqlite`, PDFs e screenshots — sem ele, cada redeploy começa do zero e a proteção de duplicidade por `automação + competência` perde a memória. O painel detecta a falta do volume e mostra um alerta vermelho fixo no topo.
 5. **Domains**: seu domínio apontando para a porta **3000**, com HTTPS.
 6. Deploy.
 
