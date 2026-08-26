@@ -329,6 +329,20 @@
     </main>
   </div>
 
+  <dialog id="confirmDialog" class="confirm-dialog">
+    <div class="dialog-form">
+      <div class="dialog-head">
+        <div><h2 id="confirmTitle">Confirmar</h2><p id="confirmMessage"></p></div>
+        <button class="icon-btn" type="button" data-close aria-label="Fechar">×</button>
+      </div>
+      <div id="confirmDetail" class="notice warning" hidden></div>
+      <div class="dialog-actions">
+        <button class="btn secondary" type="button" data-close>Cancelar</button>
+        <button class="btn primary" type="button" id="confirmOk">Confirmar</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="schedulerDialog">
     <form id="schedulerForm" class="dialog-form">
       <div class="dialog-head">
@@ -431,10 +445,12 @@
       <details>
         <summary>Tributos avançados desta automação</summary>
         <p class="hint">Preencha apenas o que realmente precisa sobrescrever. Campos vazios herdam a configuração geral.</p>
-        <div class="form-grid cols-4 detail-grid">
+        <div class="toggle-grid cols-3 detail-grid">
           <label class="toggle"><input type="checkbox" data-override="issRetention"><span></span>Forçar ISS retido</label>
           <label class="toggle"><input type="checkbox" data-override="issSuspension"><span></span>Forçar ISS suspenso</label>
           <label class="toggle"><input type="checkbox" data-override="municipalBenefit"><span></span>Forçar benefício</label>
+        </div>
+        <div class="form-grid cols-4">
           <label>PIS (%)<input type="number" step="0.01" min="0" data-override-number="pisRate"></label>
           <label>COFINS (%)<input type="number" step="0.01" min="0" data-override-number="cofinsRate"></label>
           <label>IRRF (%)<input type="number" step="0.01" min="0" data-override-number="irrfRate"></label>

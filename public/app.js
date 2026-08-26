@@ -22,6 +22,45 @@ function toast(message, error = false, sticky = false) {
   if (!sticky) toast.timer = setTimeout(() => el.classList.add('hidden'), 6000);
 }
 
+// Confirmação no visual do painel, em vez do confirm() do navegador.
+function confirmar({ title, message, detail = '', confirmLabel = 'Confirmar', danger = false }) {
+  return new Promise((resolve) => {
+    const dialog = $('#confirmDialog');
+    $('#confirmTitle').textContent = title;
+    $('#confirmMessage').textContent = message;
+    const box = $('#confirmDetail');
+    box.hidden = !detail;
+    box.textContent = detail;
+    const ok = $('#confirmOk');
+    ok.textContent = confirmLabel;
+    ok.className = `btn ${danger ? 'danger' : 'primary'}`;
+    const aoFechar = () => {
+      dialog.removeEventListener('close', aoFechar);
+      resolve(dialog.returnValue === 'ok');
+    };
+    dialog.addEventListener('close', aoFechar);
+    dialog.returnValue = '';
+    dialog.showModal();
+    ok.focus();
+  });
+}
+
+// Botão vira "carregando" durante a operação: sem isso a tela fica muda.
+async function comCarregando(botao, texto, tarefa) {
+  if (!botao) return tarefa();
+  const original = botao.textContent;
+  botao.disabled = true;
+  botao.classList.add('is-loading');
+  if (texto) botao.textContent = texto;
+  try {
+    return await tarefa();
+  } finally {
+    botao.disabled = false;
+    botao.classList.remove('is-loading');
+    botao.textContent = original;
+  }
+}
+
 function money(cents) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(cents || 0) / 100);
 }
@@ -188,7 +227,7 @@ function automationCard(a) {
     <div><div class="automation-title"><h3>${esc(a.name)}</h3>${a.enabled ? '<span class="badge ok">Ativa</span>' : '<span class="badge neutral">Pausada</span>'}</div>
       <div class="automation-meta"><span>Dia ${a.day_of_month}</span><span>${money(a.value_cents)}</span>${a.discount_incond_cents ? `<span class="tag-discount">Desc. incond. ${money(a.discount_incond_cents)}</span>` : ''}${a.discount_cond_cents ? `<span class="tag-discount">Desc. cond. ${money(a.discount_cond_cents)}</span>` : ''}${a.email_enabled ? '<span>E-mail</span>' : ''}</div>
     </div>
-    <div class="actions"><button class="btn secondary small" onclick="previewAutomationAction(${a.id})">Prévia</button><button class="btn secondary small" onclick="editAutomation(${a.id})">Editar</button><button class="btn secondary small" onclick="duplicateAutomation(${a.id})">Duplicar</button><button class="btn secondary small" onclick="toggleAutomation(${a.id},${!a.enabled})">${a.enabled ? 'Pausar' : 'Ativar'}</button><button class="btn danger small" onclick="emitNow(${a.id})">Emitir agora</button></div>
+    <div class="actions"><button class="btn secondary small" onclick="previewAutomationAction(${a.id},this)">Prévia</button><button class="btn secondary small" onclick="editAutomation(${a.id})">Editar</button><button class="btn secondary small" onclick="duplicateAutomation(${a.id})">Duplicar</button><button class="btn secondary small" onclick="toggleAutomation(${a.id},${!a.enabled})">${a.enabled ? 'Pausar' : 'Ativar'}</button><button class="btn danger small" onclick="emitNow(${a.id},this)">Emitir agora</button></div>
   </div>`;
 }
 
@@ -222,7 +261,7 @@ function renderHistory() {
   $('#historyTable').innerHTML = state.invoices.length ? state.invoices.map((i) => `<tr>
     <td>${esc(i.scheduled_date)}</td><td>${esc(i.competence)}</td><td>${esc(i.client_name)}</td><td>${money(i.value_cents)}</td><td>${badgeStatus(i.status)}</td><td>${esc(i.nfse_number || '—')}</td>
     <td><div class="file-links">${i.pdf_path ? `<a class="btn secondary small" href="/api/invoices/${i.id}/file/pdf">PDF</a>` : ''}${i.xml_path ? `<a class="btn secondary small" href="/api/invoices/${i.id}/file/xml">XML</a>` : ''}${!i.pdf_path && !i.xml_path ? '—' : ''}</div></td>
-    <td><div class="actions"><button class="btn secondary small" onclick="showInvoice(${i.id})">Detalhes</button>${i.status === 'DOCUMENT_ERROR' && i.access_key ? `<button class="btn secondary small" onclick="retryDocumentsAction(${i.id})">Documentos</button>` : ''}${['ISSUED','EMAIL_ERROR','DOCUMENT_ERROR'].includes(i.status) ? `<button class="btn secondary small" onclick="retryEmailAction(${i.id})">E-mail</button>` : ''}${i.status === 'ERROR_BEFORE_SUBMIT' ? `<button class="btn danger small" onclick="retryEmission(${i.id})">Tentar emissão</button>` : ''}</div></td>
+    <td><div class="actions"><button class="btn secondary small" onclick="showInvoice(${i.id})">Detalhes</button>${i.access_key ? `<a class="btn secondary small" href="https://www.nfse.gov.br/EmissorNacional/Notas/Visualizar/Index/${esc(i.access_key)}" target="_blank" rel="noopener" title="Abrir a nota no Emissor Nacional (para baixar XML/DANFSe oficiais)">Portal</a>` : ''}${i.status === 'DOCUMENT_ERROR' && i.access_key ? `<button class="btn secondary small" onclick="retryDocumentsAction(${i.id},this)">Documentos</button>` : ''}${['ISSUED','EMAIL_ERROR','DOCUMENT_ERROR'].includes(i.status) ? `<button class="btn secondary small" onclick="retryEmailAction(${i.id},this)">E-mail</button>` : ''}${i.status === 'ERROR_BEFORE_SUBMIT' ? `<button class="btn danger small" onclick="retryEmission(${i.id},this)">Tentar emissão</button>` : ''}</div></td>
   </tr>`).join('') : '<tr><td colspan="8" class="empty">Sem histórico.</td></tr>';
 }
 
@@ -242,7 +281,17 @@ window.editClient = function(id) {
   $('#clientImportResult').hidden = true;
   $('#clientDialogTitle').textContent = 'Editar cliente'; $('#clientDialog').showModal();
 };
-window.deactivateClientAction = async function(id) { if (!confirm('Desativar este cliente?')) return; try { await api(`/api/clients/${id}`, { method:'DELETE' }); toast('Cliente desativado.'); await refreshAll(); } catch(e){toast(e.message,true);} };
+window.deactivateClientAction = async function(id) {
+  const cliente = state.clients.find((c) => c.id === id);
+  const ok = await confirmar({
+    title: 'Desativar cliente',
+    message: `${cliente?.name || 'Este cliente'} sai da lista e suas automações param de gerar nota. O histórico é mantido.`,
+    confirmLabel: 'Desativar',
+    danger: true
+  });
+  if (!ok) return;
+  try { await api(`/api/clients/${id}`, { method:'DELETE' }); toast('Cliente desativado.'); await refreshAll(); } catch(e){toast(e.message,true);}
+};
 
 function openNewClient() { const f=$('#clientForm'); f.reset(); f.id.value=''; f.active.checked=true; $('#clientImportResult').hidden=true; $('#clientDialogTitle').textContent='Novo cliente'; $('#clientDialog').showModal(); }
 
@@ -279,11 +328,50 @@ window.newAutomationFor = function(clientId) {
 function openNewAutomation(){ const f=$('#automationForm'); f.reset(); f.id.value=''; $('#automationImportResult').hidden=true; f.dayOfMonth.value=1; f.discountIncond.value='0'; f.discountCond.value='0'; f.enabled.checked=true; f.emailEnabled.checked=true; $('#automationDialogTitle').textContent='Nova automação'; $('#automationDialog').showModal(); }
 
 window.toggleAutomation=async(id,enabled)=>{try{await api(`/api/automations/${id}/toggle`,{method:'POST',body:JSON.stringify({enabled})});toast(enabled?'Automação ativada.':'Automação pausada.');await refreshAll();}catch(e){toast(e.message,true)}};
-window.previewAutomationAction=async(id)=>{try{toast('Abrindo o portal e preenchendo a Emissão Completa até a revisão... isso leva alguns segundos.',false,true);const r=await api(`/api/automations/${id}/preview`,{method:'POST',body:'{}'});toast('Prévia concluída sem emitir. Confira os campos antes de liberar a emissão real.');window.openImage(r.screenshotUrl,'Prévia da NFS-e (não emitida)');}catch(e){toast(e.message,true);showErrorEvidence(e.message);}};
-window.emitNow=async(id)=>{if(!state.settings.scheduler.emissionEnabled){toast('Ative “Permitir emissão real” nas configurações antes.',true);return;}if(!confirm('Isto vai tentar EMITIR uma NFS-e real agora. Confirma?'))return;try{toast('Emitindo no portal... não feche a página.',false,true);const r=await api(`/api/automations/${id}/run`,{method:'POST',body:JSON.stringify({confirmation:'EMITIR'})});toast(`Processamento concluído: ${statusLabels[r.status]?.[0]||r.status}`);await refreshAll();}catch(e){toast(e.message,true);showErrorEvidence(e.message);}};
-window.retryDocumentsAction=async(id)=>{try{await api(`/api/invoices/${id}/retry-documents`,{method:'POST',body:'{}'});toast('Tentativa de recuperar documentos concluída.');await refreshAll();}catch(e){toast(e.message,true)}};
-window.retryEmailAction=async(id)=>{try{await api(`/api/invoices/${id}/retry-email`,{method:'POST',body:'{}'});toast('E-mail enviado.');await refreshAll();}catch(e){toast(e.message,true)}};
-window.retryEmission=async(id)=>{if(!state.settings.scheduler.emissionEnabled){toast('Emissão real está bloqueada.',true);return;}if(!confirm('A falha ocorreu ANTES do clique final. Tentar novamente a emissão?'))return;try{await api(`/api/invoices/${id}/retry`,{method:'POST',body:JSON.stringify({confirmation:'EMITIR'})});toast('Nova tentativa concluída.');await refreshAll();}catch(e){toast(e.message,true)}};
+window.previewAutomationAction=async(id,botao)=>{
+  try{
+    toast('Abrindo o portal e preenchendo a Emissão Completa até a revisão... isso leva alguns segundos.',false,true);
+    const r=await comCarregando(botao,'Preenchendo...',()=>api(`/api/automations/${id}/preview`,{method:'POST',body:'{}'}));
+    toast('Prévia concluída sem emitir. Confira os campos antes de liberar a emissão real.');
+    window.openImage(r.screenshotUrl,'Prévia da NFS-e (não emitida)');
+  }catch(e){toast(e.message,true);showErrorEvidence(e.message);}
+};
+window.emitNow=async(id,botao)=>{
+  if(!state.settings.scheduler.emissionEnabled){toast('Ative “Permitir emissão real” no Agendamento antes.',true);return;}
+  const a=state.automations.find((x)=>x.id===id);
+  const ok=await confirmar({
+    title:'Emitir NFS-e de verdade',
+    message:`${a?.client_name||'Cliente'} · ${money(a?.value_cents)} — a nota será emitida agora no Emissor Nacional.`,
+    detail:'Depois do clique final não há como desfazer pelo painel: um cancelamento tem que ser feito no portal.',
+    confirmLabel:'Emitir agora',
+    danger:true
+  });
+  if(!ok)return;
+  try{
+    toast('Emitindo no portal... não feche a página.',false,true);
+    const r=await comCarregando(botao,'Emitindo...',()=>api(`/api/automations/${id}/run`,{method:'POST',body:JSON.stringify({confirmation:'EMITIR'})}));
+    toast(`Processamento concluído: ${statusLabels[r.status]?.[0]||r.status}`);
+    await refreshAll();
+  }catch(e){toast(e.message,true);showErrorEvidence(e.message);}
+};
+window.retryDocumentsAction=async(id,botao)=>{try{toast('Buscando XML e DANFSe no portal...',false,true);await comCarregando(botao,'Buscando...',()=>api(`/api/invoices/${id}/retry-documents`,{method:'POST',body:'{}'}));toast('Tentativa de recuperar documentos concluída.');await refreshAll();}catch(e){toast(e.message,true)}};
+window.retryEmailAction=async(id,botao)=>{try{toast('Enviando o e-mail...',false,true);await comCarregando(botao,'Enviando...',()=>api(`/api/invoices/${id}/retry-email`,{method:'POST',body:'{}'}));toast('E-mail enviado.');await refreshAll();}catch(e){toast(e.message,true)}};
+window.retryEmission=async(id,botao)=>{
+  if(!state.settings.scheduler.emissionEnabled){toast('Emissão real está bloqueada.',true);return;}
+  const ok=await confirmar({
+    title:'Tentar a emissão de novo',
+    message:'Esta nota falhou antes do clique final, então repetir é seguro: nada foi enviado ao portal.',
+    confirmLabel:'Tentar emitir',
+    danger:true
+  });
+  if(!ok)return;
+  try{
+    toast('Emitindo no portal... não feche a página.',false,true);
+    await comCarregando(botao,'Emitindo...',()=>api(`/api/invoices/${id}/retry`,{method:'POST',body:JSON.stringify({confirmation:'EMITIR'})}));
+    toast('Nova tentativa concluída.');
+    await refreshAll();
+  }catch(e){toast(e.message,true);showErrorEvidence(e.message);}
+};
 
 window.showInvoice=async function(id){try{const i=await api(`/api/invoices/${id}`);$('#invoiceDialogSubtitle').textContent=`${i.client_name} · ${i.competence}`;$('#invoiceDetails').innerHTML=`
   <div class="form-grid cols-2"><div><strong>Status</strong><p>${badgeStatus(i.status)}</p></div><div><strong>Valor</strong><p>${money(i.value_cents)}</p></div><div><strong>NFS-e</strong><p>${esc(i.nfse_number||'—')}</p></div><div><strong>Chave</strong><p class="mono">${esc(i.access_key||'—')}</p></div><div class="span-2"><strong>Último erro/aviso</strong><p class="${i.last_error?'danger-text':''}">${esc(i.last_error||'Nenhum')}</p></div></div>
@@ -395,6 +483,7 @@ $$('dialog').forEach((dialog) => {
 });
 
 $$('.nav[data-tab]').forEach((b)=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+$('#confirmOk').addEventListener('click',()=>$('#confirmDialog').close('ok'));
 $('#openSchedulerBtn').addEventListener('click',()=>{fillForm($('#schedulerForm'));$('#schedulerTz').textContent=state.status?.timezone||'—';$('#schedulerInterval').textContent=humanInterval(state.status?.workerIntervalMinutes);$('#schedulerDialog').showModal();});
 $('#newClientBtn').addEventListener('click',openNewClient);
 $('#newAutomationBtn').addEventListener('click',openNewAutomation);
@@ -509,12 +598,31 @@ $('#xmlFileInput').addEventListener('change',async(event)=>{
 });
 
 // --- testes e sessão ---
-$('#testLoginBtn').addEventListener('click',async()=>{try{toast('Testando login no portal...',false,true);await api('/api/test-login',{method:'POST',body:'{}'});toast('Login no Emissor Nacional OK.');}catch(e){toast(e.message,true)}});
-async function verifyMail(){try{toast('Testando provedor de e-mail...',false,true);const r=await api('/api/test-email',{method:'POST',body:'{}'});toast(r.provider==='brevo'?`Brevo autenticado${r.account?` (${r.account})`:''}.`:'SMTP autenticado com sucesso.');}catch(e){toast(e.message,true)}}
-$('#testMailBtn').addEventListener('click',verifyMail);
-$('#verifyMailBtn').addEventListener('click',verifyMail);
-$('#sendTestMailBtn').addEventListener('click',async()=>{const to=$('#testEmailTo').value.trim();if(!to){toast('Informe o e-mail de destino do teste.',true);return;}try{toast('Enviando e-mail de teste...',false,true);const r=await api('/api/send-test-email',{method:'POST',body:JSON.stringify({to})});toast(`E-mail de teste enviado para ${r.recipients.join(', ')}.`);}catch(e){toast(e.message,true)}});
+$('#testLoginBtn').addEventListener('click',async(e)=>{try{toast('Testando login no portal...',false,true);await comCarregando(e.currentTarget,'Testando...',()=>api('/api/test-login',{method:'POST',body:'{}'}));toast('Login no Emissor Nacional OK.');}catch(err){toast(err.message,true)}});
+async function verifyMail(botao){try{toast('Testando provedor de e-mail...',false,true);const r=await comCarregando(botao,'Testando...',()=>api('/api/test-email',{method:'POST',body:'{}'}));toast(r.provider==='brevo'?`Brevo autenticado${r.account?` (${r.account})`:''}.`:'SMTP autenticado com sucesso.');}catch(e){toast(e.message,true)}}
+$('#testMailBtn').addEventListener('click',(e)=>verifyMail(e.currentTarget));
+$('#verifyMailBtn').addEventListener('click',(e)=>verifyMail(e.currentTarget));
+$('#sendTestMailBtn').addEventListener('click',async(e)=>{const to=$('#testEmailTo').value.trim();if(!to){toast('Informe o e-mail de destino do teste.',true);return;}try{toast('Enviando e-mail de teste...',false,true);const r=await comCarregando(e.currentTarget,'Enviando...',()=>api('/api/send-test-email',{method:'POST',body:JSON.stringify({to})}));toast(`E-mail de teste enviado para ${r.recipients.join(', ')}.`);}catch(err){toast(err.message,true)}});
 $('#logoutBtn').addEventListener('click',async()=>{try{await api('/api/logout',{method:'POST',body:'{}'});}catch{}location.href='/login';});
-$('#runDueBtn').addEventListener('click',async()=>{if(state.settings.scheduler.emissionEnabled&&!confirm('A emissão real está permitida. Processar as pendências vencidas agora?'))return;try{const r=await api('/api/run-now',{method:'POST',body:'{}'});toast(r.allowEmission?'Pendências processadas com emissão habilitada.':'Pendências registradas; emissão real está bloqueada.');await refreshAll();}catch(e){toast(e.message,true)}});
+$('#runDueBtn').addEventListener('click',async(e)=>{
+  const botao=e.currentTarget;
+  const vaiEmitir=state.settings.scheduler.emissionEnabled;
+  const ok=await confirmar({
+    title:vaiEmitir?'Processar pendências e emitir':'Processar pendências',
+    message:vaiEmitir
+      ? 'A emissão real está permitida: as notas vencidas serão emitidas agora no Emissor Nacional, uma por vez.'
+      : 'As competências vencidas serão registradas como pendentes. Nada será emitido, porque a emissão real está bloqueada.',
+    detail:vaiEmitir?'Cada nota abre o navegador no portal; pode levar alguns minutos.':'',
+    confirmLabel:vaiEmitir?'Processar e emitir':'Processar',
+    danger:vaiEmitir
+  });
+  if(!ok)return;
+  try{
+    toast('Processando as pendências... isso pode levar alguns minutos.',false,true);
+    const r=await comCarregando(botao,'Processando...',()=>api('/api/run-now',{method:'POST',body:'{}'}));
+    toast(r.allowEmission?`Pendências processadas: ${r.issued||0} emitida(s), ${r.pending||0} na fila.`:'Pendências registradas; emissão real está bloqueada.');
+    await refreshAll();
+  }catch(e){toast(e.message,true);showErrorEvidence(e.message);}
+});
 
 refreshAll().catch((e)=>toast(e.message,true));

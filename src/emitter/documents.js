@@ -2,7 +2,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { DATA_DIR } = require('../db');
 const { baseUrl } = require('./auth');
-const { safeFilename } = require('../utils');
+const { safeFilename, competenceParts, MONTHS_PT } = require('../utils');
+const { dadosDanfse } = require('../danfse-parse');
+const { renderDanfseHtml } = require('../danfse');
 
 function extractAccessKey(text) {
   const clean = String(text || '').replace(/[.\s-]/g, ' ');
@@ -51,7 +53,7 @@ async function requestAndSave(context, url, filePath, expected = null) {
 async function archiveDocuments({ page, context, invoice, accessKey }) {
   const dir = path.join(DATA_DIR, 'files', invoice.competence, `invoice-${invoice.id}`);
   fs.mkdirSync(dir, { recursive: true });
-  const result = { xmlPath: null, pdfPath: null, warnings: [] };
+  const result = { xmlPath: null, pdfPath: null, warnings: [], notes: [] };
 
   if (!accessKey) {
     result.warnings.push('Chave da NFS-e não identificada na tela pós-emissão; documentos não foram arquivados automaticamente.');
@@ -66,36 +68,54 @@ async function archiveDocuments({ page, context, invoice, accessKey }) {
     text: (e.textContent || '').trim()
   }))).catch(() => []);
 
-  const xmlLink = links.find((x) => /xml/i.test(`${x.text} ${x.href}`));
+  const xmlLink = links.find((x) => /Download\/NFSe/i.test(x.href) || /xml/i.test(`${x.text} ${x.href}`));
   const xmlPath = path.join(dir, `${safeFilename(accessKey)}.xml`);
   if (xmlLink) {
     if (await requestAndSave(context, xmlLink.href, xmlPath, 'xml').catch(() => false)) result.xmlPath = xmlPath;
-    else result.warnings.push('O link autenticado de XML foi encontrado, mas o download falhou.');
+    else result.notes.push('O XML oficial exige CAPTCHA no portal; use o botão "Portal" no histórico para baixá-lo quando precisar.');
   } else {
-    result.warnings.push('O portal não exibiu link de XML na visualização autenticada.');
+    result.notes.push('O portal não exibiu link de XML na visualização autenticada.');
   }
 
-  const printLink = links.find((x) => /Visualizar\/Impressao/i.test(x.href) || /imprimir|impress[aã]o/i.test(x.text));
-  if (printLink) {
-    const pdfPath = path.join(dir, `${safeFilename(accessKey)}-danfse.pdf`);
-    try {
-      await page.goto(printLink.href, { waitUntil: 'networkidle', timeout: 30000 });
-      const body = await page.locator('body').innerText().catch(() => '');
-      if (/captcha/i.test(body)) {
-        result.warnings.push('A página de impressão exigiu CAPTCHA; o sistema não tenta contorná-lo.');
-      } else {
-        await page.emulateMedia({ media: 'print' }).catch(() => {});
-        await page.pdf({ path: pdfPath, format: 'A4', printBackground: true, preferCSSPageSize: true });
-        result.pdfPath = pdfPath;
-      }
-    } catch (err) {
-      result.warnings.push(`Falha ao gerar PDF pela visualização autenticada: ${err.message}`);
-    }
-  } else {
-    result.warnings.push('O portal não exibiu a rota autenticada de impressão do DANFSe.');
+  // O DANFSe oficial fica atrás de hCaptcha no portal. Desde a NT 008/2026 quem
+  // emite gera o documento auxiliar por conta própria: montamos com os dados da
+  // própria visualização, que abre normalmente pela sessão autenticada.
+  const pdfPath = path.join(dir, `${safeFilename(accessKey)}-danfse.pdf`);
+  try {
+    const dados = dadosDanfse(await page.content());
+    dados.numero = invoice.nfse_number || dados.numero || '';
+    dados.competencia = competenciaExtenso(invoice.competence);
+    dados.valorLiquido = dados.valorLiquido || moeda(liquido(invoice));
+    dados.descontoCondicionado = moeda(invoice.discount_cond_cents);
+    if (!dados.chave) dados.chave = accessKey;
+
+    const html = await renderDanfseHtml(dados);
+    await page.setContent(html, { waitUntil: 'load' });
+    await page.pdf({ path: pdfPath, format: 'A4', printBackground: true, preferCSSPageSize: true });
+    result.pdfPath = pdfPath;
+    result.danfseGerado = true;
+  } catch (err) {
+    result.warnings.push(`Falha ao gerar o DANFSe local: ${err.message}`);
   }
 
   return result;
+}
+
+function moeda(cents) {
+  return (Number(cents || 0) / 100).toFixed(2).replace('.', ',');
+}
+
+function liquido(invoice) {
+  return Number(invoice.value_cents || 0) - Number(invoice.discount_incond_cents || 0) - Number(invoice.discount_cond_cents || 0);
+}
+
+function competenciaExtenso(competence) {
+  try {
+    const { year, month } = competenceParts(competence);
+    return `${MONTHS_PT[month - 1]}/${year}`;
+  } catch {
+    return String(competence || '');
+  }
 }
 
 module.exports = { extractAccessKey, extractNfseNumber, discoverMetadata, archiveDocuments };

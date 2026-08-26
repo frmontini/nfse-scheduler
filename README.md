@@ -50,7 +50,7 @@ Também foram usados como referência de arquitetura/comportamento:
 - Aviso para você sempre que a nota é enviada ao cliente (e-mail separado e/ou cópia oculta).
 - Dockerfile + Docker Compose.
 - Screenshots de prévia/erro em `./data/debug`.
-- XML/PDF em `./data/files` quando o portal permitir obtê-los pela sessão autenticada.
+- DANFSe v2.0 gerado localmente (com QR Code) em `./data/files`; o XML oficial fica no portal, atrás de CAPTCHA.
 
 ## Importar XML da NFS-e
 
@@ -104,6 +104,121 @@ O modo foi mapeado contra o portal e validado por Prévia. Ligá-lo muda o fluxo
 3. **Etapa Valores** passa a exigir `ValorTributos.CodigoSituacaoTributaria` (CST do IBS/CBS) e `ValorTributos.CodigoClassificacaoTributaria`, cujas opções o portal filtra pelo CST escolhido.
 
 Os três últimos são **decisão fiscal, não configuração de software**: definem local de incidência e enquadramento. O projeto não escolhe nenhum por você — com o modo ligado e algum deles vazio, a emissão para antes de abrir o navegador, dizendo qual falta. Na Prévia de validação, o portal calculou IBS de R$ 0,18 e CBS de R$ 1,65 sobre base de R$ 183,15, com as alíquotas de teste.
+
+## Município e Código de Tributação: por que existem dois campos
+
+As duas listas dessa etapa no portal são widgets **Select2 com busca no servidor**: a lista não vem pronta, é preciso digitar um termo, esperar o AJAX responder e então clicar na opção certa. Daí o par de campos, herdado do `Sutil/Emissor-NFS-e-bot`: um termo alimenta a busca, o outro identifica a opção no resultado.
+
+Nesta versão o **termo de busca é opcional**: quando fica vazio, ele é deduzido do nome exato — município sem a UF (`Neves Paulista/SP` → `Neves Paulista`) e código de tributação pelo número (`01.01.01 - Análise...` → `01.01.01`), que é como o portal indexa cada lista. O painel mostra só o nome; o termo fica em *Ajuste fino da busca*, para o caso raro de a dedução não achar a opção.
+
+A emissão agora exige apenas **município**, **código de tributação** e **descrição** preenchidos.
+
+## CNAE e NBS
+
+CNAE e NBS ficam persistidos como **dados cadastrais/referência**. No fluxo Web atual da Emissão Completa, o campo operacional que a automação seleciona é o **Código de Tributação Nacional do serviço**. O projeto não injeta CNAE/NBS em campos inexistentes só para “preencher tudo”.
+
+Existe um campo `ServicoPrestado_CodigoNBS` no portal, mas ele aparece no fluxo de **exportação/serviço internacional**, que este projeto não automatiza — conferido contra `Sutil/Emissor-NFS-e-bot`, que só o usa em `EmitirInternacional`.
+
+## Valor aproximado dos tributos
+
+O portal oferece quatro opções nesse bloco, e o painel usa exatamente as mesmas:
+
+| Opção | `ValorTributos.TipoValorTributos` | Campo preenchido |
+| --- | --- | --- |
+| Informar alíquota do Simples Nacional | 4 | `ValorTributos.AliquotaSN` |
+| Configurar valores percentuais | 2 | `PercentualTotalFederal/Estadual/Municipal` |
+| Preencher valores monetários | 1 | `ValorTotalFederal/Estadual/Municipal` |
+| Não informar (Decreto 8.264/2014) | 3 | — |
+
+Para optante do Simples o portal **já marca a opção 4** e mostra o campo de alíquota; é o padrão do projeto, alimentado pelo `pTotTribSN` do XML.
+
+## Simples Nacional
+
+Para optante, o portal exige na etapa Pessoas o **Regime de Apuração dos Tributos no Simples Nacional** (`SimplesNacional.RegimeApuracaoTributosSN`), um campo obrigatório que não existia nas versões anteriores do fluxo:
+
+| Valor | Significado |
+| --- | --- |
+| 1 | Tributos federais e municipal pelo Simples Nacional |
+| 2 | Federais pelo Simples Nacional e ISSQN pela NFS-e, conforme a legislação municipal |
+| 3 | Federais e municipal pela NFS-e, conforme a legislação de cada tributo |
+
+Ele fica em *Empresa e tributos → Tributos* e vem preenchido pelo `regApTribSN` do XML importado. É um `<select>` escondido atrás de um widget Chosen: a automação tenta abrir o widget e clicar na opção e, se o widget não responder, escreve o valor no select nativo disparando `change`. Como o campo é obrigatório, falhar nele **para antes do Avançar**, com mensagem própria, em vez de esbarrar no "Campo obrigatório" genérico do portal.
+
+Quando o portal deixa campos de tributação federal bloqueados/`readonly`, o sistema **não força alteração**. Ele tenta preencher apenas campos editáveis. Isso evita sobrescrever valores que o próprio Emissor calcula/preenche para o regime tributário do prestador.
+
+## Desconto incondicional
+
+Há campo específico por automação. Na etapa Valores, a automação procura o campo do portal usando os IDs conhecidos e um fallback pelo rótulo “Desconto incondicional”. Se o portal mudar e o campo não puder ser localizado, a emissão para **antes do clique final** com `ERROR_BEFORE_SUBMIT`.
+
+## Várias notas para o mesmo cliente
+
+O cliente é cadastrado **uma vez** (CPF/CNPJ é único, porque é a mesma empresa). Quem gera nota é a **automação**, e um cliente pode ter quantas automações você quiser:
+
+```text
+ACME COMERCIO LTDA (cadastrado uma vez)
+├── ACME - mensalidade do contrato        R$ 3.500,00   sem desconto
+└── ACME - consultoria avulsa             R$ 1.200,00   desc. incondicional R$ 200 + condicionado R$ 100
+```
+
+Na competência 2026-08 isso vira **duas NFS-e separadas**, cada uma com seus valores, descontos, descrição, município e código de tributação. Valor, desconto incondicional e desconto condicionado são campos **de cada automação** — e a aba *Tributos avançados* de cada uma ainda sobrescreve ISS/PIS/COFINS/IRRF/CSLL quando aquela nota específica precisa.
+
+A trava de duplicidade é por `automação + competência`, e não por cliente: duas automações do mesmo cliente **não** brigam entre si, mas a mesma automação nunca emite duas vezes no mesmo mês.
+
+No painel:
+
+- a lista de **Automações** vem agrupada por cliente, mostrando quantas notas por competência e o total mensal;
+- **+ Outra nota para este cliente** (no grupo ou na aba *Clientes*) abre o cadastro já com o cliente escolhido;
+- **Duplicar** copia uma automação existente para você só trocar o desconto/valor e salvar.
+
+## Data de Competência
+
+O campo **Data de Competência** do portal recebe sempre a **data da geração da nota**, no timezone configurado — igual ao que o portal preenche quando você emite à mão, e igual ao `Sutil/Emissor-NFS-e-bot`. Não existe data de competência guardada nem derivada.
+
+A *competência* que continua no banco é outra coisa: o **mês de referência** (`2026-08`), sempre o mês corrente. Ela não vai para esse campo; serve para
+
+- os placeholders `{MES}`/`{MES_NUM}`/`{ANO}` da descrição do serviço e do e-mail;
+- a trava `automação + competência`, que impede duas notas da mesma automação no mesmo mês;
+- a organização de `data/files` e do histórico.
+
+Não há mais escolha de *mês atual / mês anterior*: como a data enviada ao portal é sempre a da emissão, o mês de referência acompanha. A coluna `competence_mode` continua no schema por compatibilidade com bancos antigos, mas não é lida.
+
+## Segurança contra nota duplicada
+
+Existem duas camadas:
+
+1. SQLite impede mais de um registro para a mesma `automação + competência`.
+2. Imediatamente antes de clicar em **Emitir NFS-e**, o registro recebe `submitted_at` e status `SUBMITTING`.
+
+Depois dessa fronteira, qualquer timeout, mudança de HTML ou resposta incerta vira `REVIEW_REQUIRED`. O worker **não tenta emitir de novo automaticamente**. Primeiro confira no portal.
+
+Principais status:
+
+- `PENDING`: registrada, ainda não enviada;
+- `ERROR_BEFORE_SUBMIT`: falhou antes do clique final; pode ser repetida com segurança após correção;
+- `SUBMITTING`: fronteira do clique final;
+- `REVIEW_REQUIRED`: resultado incerto; conferir manualmente;
+- `ISSUED`: emissão confirmada por chave capturada;
+- `DOCUMENT_ERROR`: nota emitida, mas PDF/XML ainda não recuperados;
+- `EMAIL_ERROR`: nota emitida, falha apenas no SMTP;
+- `SENT`: e-mail enviado.
+
+## PDF/DANFSe e CAPTCHA
+
+O projeto **não resolve, burla nem tenta contornar CAPTCHA**.
+
+No Emissor Nacional, os botões que baixam o **DANFSe oficial** e o **XML** abrem um modal de hCaptcha (`ModalCaptcha/Abrir?redirectUrl=/EmissorNacional/Notas/Download/...`); a requisição direta responde **403**. Ou seja, esses dois arquivos não podem ser obtidos automaticamente.
+
+A *página* de visualização, por outro lado, abre normalmente pela sessão autenticada. É de lá que sai o documento:
+
+1. depois da emissão, o sistema abre `Notas/Visualizar/Index/{chave}`;
+2. lê os campos da nota (prestador, tomador, serviço, ISSQN, federal, valores);
+3. monta o **DANFSe v2.0** e imprime em PDF com o Chromium.
+
+Isso é o que a **NT 008/2026** determina desde 01/07/2026: a API oficial de DANFSe foi descontinuada e quem emite gera o documento auxiliar localmente. O PDF sai em uma página A4, com QR Code apontando para `nfse.gov.br/ConsultaPublica/?tpc=1&chave=…`, e inclui o bloco de IBS/CBS do leiaute v2.0.
+
+O **XML** continua só no portal: o histórico tem um botão **Portal**, que abre a nota para você baixá-lo à mão quando precisar. Isso é registrado como observação da nota, não como erro — não há o que corrigir no sistema.
+
+O layout fica em `src/danfse.js` e a leitura da visualização em `src/danfse-parse.js`.
 
 ## Município e Código de Tributação: por que existem dois campos
 

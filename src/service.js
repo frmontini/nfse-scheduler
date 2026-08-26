@@ -75,7 +75,8 @@ async function processInvoice(invoiceId, { allowEmission = false } = {}) {
     addInvoiceEvent(invoice.id, 'ISSUED', 'O portal concluiu a emissão da NFS-e.', {
       nfseNumber: result.nfseNumber || null,
       accessKey: result.accessKey || null,
-      warnings: result.warnings || []
+      warnings: result.warnings || [],
+      notes: result.notes || []
     });
 
     invoice = getInvoice(invoice.id);
@@ -144,7 +145,7 @@ async function retryDocuments(invoiceId) {
       status: (docs.pdfPath || invoice.pdf_path) ? 'ISSUED' : 'DOCUMENT_ERROR',
       last_error: docs.warnings?.length ? docs.warnings.join(' | ') : null
     });
-    addInvoiceEvent(invoice.id, 'DOCUMENT_RETRY', docs.pdfPath ? 'DANFSe recuperado.' : 'Nova tentativa de recuperar documentos não obteve PDF.', { warnings: docs.warnings });
+    addInvoiceEvent(invoice.id, 'DOCUMENT_RETRY', docs.pdfPath ? 'DANFSe gerado a partir da nota no portal.' : 'Nova tentativa não conseguiu gerar o DANFSe.', { warnings: docs.warnings, notes: docs.notes });
     return getInvoice(invoice.id);
   } catch (err) {
     updateInvoice(invoice.id, { status: 'DOCUMENT_ERROR', last_error: err.message });
