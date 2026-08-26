@@ -100,7 +100,7 @@
             </details>
             <div class="subcard">
               <div class="subcard-head"><h3>IBS/CBS</h3><span class="badge neutral" id="ibsCbsState">—</span></div>
-              <div class="toggle-grid">
+              <div class="toggle-grid cols-3">
                 <label class="toggle"><input type="checkbox" name="portal.fillIbsCbs"><span></span>Preencher informações de IBS/CBS</label>
                 <label class="toggle"><input type="checkbox" name="portal.governmentPurchase"><span></span>É compra governamental</label>
                 <label class="toggle"><input type="checkbox" name="portal.recipientIsBuyer"><span></span>Destinatário é o próprio adquirente</label>
@@ -171,19 +171,19 @@
 
           <div class="card">
             <div class="card-head"><div><h2>Tributos</h2><p>Padrões gerais; cada automação pode sobrescrever valores avançados.</p></div></div>
-            <div class="toggle-row">
+            <div class="toggle-grid cols-4">
               <label class="toggle"><input type="checkbox" name="tax.simpleNational"><span></span>Optante pelo Simples Nacional</label>
               <label class="toggle"><input type="checkbox" name="tax.issSuspension"><span></span>ISS suspenso</label>
               <label class="toggle"><input type="checkbox" name="tax.issRetention"><span></span>ISS retido</label>
               <label class="toggle"><input type="checkbox" name="tax.municipalBenefit"><span></span>Benefício municipal</label>
             </div>
-            <div class="form-grid cols-4">
-              <label class="span-2">Regime de Apuração no Simples Nacional<select name="tax.snApuracaoRegime">
+            <div class="form-grid cols-6">
+              <label class="span-3">Regime de Apuração no Simples Nacional<select name="tax.snApuracaoRegime">
                 <option value="1">1 - Tributos federais e municipal pelo Simples Nacional</option>
                 <option value="2">2 - Federais pelo Simples Nacional e ISSQN pela NFS-e (legislação municipal)</option>
                 <option value="3">3 - Federais e municipal pela NFS-e (legislação de cada tributo)</option>
               </select><small>Obrigatório para optantes; é o <code>regApTribSN</code> da nota e vem preenchido pelo XML.</small></label>
-              <label class="span-2">Situação tributária PIS/COFINS/CSLL<select name="tax.pisCofinsSituacao">
+              <label class="span-3">Situação tributária PIS/COFINS/CSLL<select name="tax.pisCofinsSituacao">
                 <option value="0">00 - Nenhum</option>
                 <option value="1">01 - Operação Tributável com Alíquota Básica</option>
                 <option value="2">02 - Operação Tributável com Alíquota Diferenciada</option>
@@ -229,23 +229,23 @@
                 <option value="8">8 - PIS/COFINS Não Retidos, CSLL Retido</option>
                 <option value="9">9 - COFINS Não Retido, PIS/CSLL Retidos</option>
               </select></label>
-              <label>PIS (%)<input type="number" step="0.01" min="0" name="tax.pisRate"></label>
-              <label>COFINS (%)<input type="number" step="0.01" min="0" name="tax.cofinsRate"></label>
-              <label>IRRF (%)<input type="number" step="0.01" min="0" name="tax.irrfRate"></label>
-              <label>CSLL (%)<input type="number" step="0.01" min="0" name="tax.csllRate"></label>
-              <label>Contrib. previdenciária (%)<input type="number" step="0.01" min="0" name="tax.cpRate"></label>
+              <label class="span-2">PIS (%)<input type="number" step="0.01" min="0" name="tax.pisRate"></label>
+              <label class="span-2">COFINS (%)<input type="number" step="0.01" min="0" name="tax.cofinsRate"></label>
+              <label class="span-2">IRRF (%)<input type="number" step="0.01" min="0" name="tax.irrfRate"></label>
+              <label class="span-2">CSLL (%)<input type="number" step="0.01" min="0" name="tax.csllRate"></label>
+              <label class="span-2">Contrib. previdenciária (%)<input type="number" step="0.01" min="0" name="tax.cpRate"></label>
             </div>
-            <div class="form-grid cols-4 detail-grid">
-              <label class="span-2" id="approxModeField">Valor aproximado dos tributos<select name="tax.approxMode">
+            <div class="form-grid cols-6 detail-grid">
+              <label class="span-3" id="approxModeField">Valor aproximado dos tributos<select name="tax.approxMode">
                 <option value="sn">Informar alíquota do Simples Nacional</option>
                 <option value="percent">Configurar valores percentuais</option>
                 <option value="value">Preencher valores monetários</option>
                 <option value="none">Não informar (Decreto 8.264/2014)</option>
               </select><small>Mesmas opções do portal.</small></label>
-              <label class="span-2" id="snRateField">Alíquota do Simples Nacional (%)<input type="number" step="0.01" min="0" name="tax.snTotalRate"><small>Vai em <code>ValorTributos.AliquotaSN</code>; é o <code>pTotTribSN</code> do XML.</small></label>
-              <label id="approxFederalField">Federal<input type="number" step="0.01" min="0" name="tax.approxFederal"></label>
-              <label id="approxStateField">Estadual<input type="number" step="0.01" min="0" name="tax.approxState"></label>
-              <label id="approxMunicipalField">Municipal<input type="number" step="0.01" min="0" name="tax.approxMunicipal"></label>
+              <label class="span-3" id="snRateField">Alíquota do Simples Nacional (%)<input type="number" step="0.01" min="0" name="tax.snTotalRate"><small>Vai em <code>ValorTributos.AliquotaSN</code>; é o <code>pTotTribSN</code> do XML.</small></label>
+              <label class="span-2" id="approxFederalField">Federal<input type="number" step="0.01" min="0" name="tax.approxFederal"></label>
+              <label class="span-2" id="approxStateField">Estadual<input type="number" step="0.01" min="0" name="tax.approxState"></label>
+              <label class="span-2" id="approxMunicipalField">Municipal<input type="number" step="0.01" min="0" name="tax.approxMunicipal"></label>
             </div>
             <div class="notice info">No Simples Nacional, campos federais que o Emissor Nacional deixar bloqueados/readonly são preservados: a automação só preenche o que estiver editável.</div>
           </div>
@@ -272,7 +272,7 @@
         <form id="alertsForm">
           <div class="card">
             <div class="card-head"><div><h2>Aviso para mim</h2><p>Ping a cada NFS-e que chega ao cliente.</p></div></div>
-            <div class="toggle-row">
+            <div class="toggle-grid">
               <label class="toggle"><input type="checkbox" name="email.notifyOnSent"><span></span>Quero ser avisado a cada nota enviada</label>
               <label class="toggle"><input type="checkbox" name="email.notifyAttach"><span></span>Anexar PDF/XML no aviso</label>
             </div>
@@ -291,7 +291,7 @@
 
           <div class="card">
             <div class="card-head"><div><h2>E-mail para o cliente</h2><p>Mensagem que acompanha a NFS-e emitida.</p></div></div>
-            <div class="toggle-row">
+            <div class="toggle-grid cols-3">
               <label class="toggle"><input type="checkbox" name="email.enabled"><span></span>Envio automático habilitado</label>
               <label class="toggle"><input type="checkbox" name="email.requirePdf"><span></span>Exigir PDF antes de enviar</label>
               <label class="toggle"><input type="checkbox" name="email.attachXml"><span></span>Anexar XML quando disponível</label>
